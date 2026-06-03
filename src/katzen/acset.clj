@@ -27,10 +27,20 @@
 ;;    :objects   [Symbol ...]            ;; ordered (preserves declaration order)
 ;;    :homs      [{:name Sym :dom Sym :codom Sym} ...]
 ;;    :attr-types [Symbol ...]
-;;    :attrs     [{:name Sym :dom Sym :codom Sym} ...]}
+;;    :attrs     [{:name Sym :dom Sym :codom Sym} ...]
+;;    :equations [{:name Sym? :dom Sym :lhs [Sym ...] :rhs [Sym ...] :codom Sym?} ...]
+;;    :axioms    [{:name Sym :ctx [{:name Sym :type Sym} ...] :lhs term :rhs term} ...]}
 ;;
 ;; The :dom and :codom for :homs are object names; for :attrs, :codom is
 ;; an attr-type name.
+;;
+;; :equations are PATH equations (the ACSets.jl `eqs` idiom): two morphism
+;; paths out of object :dom — sequences of hom/attr names applied
+;; left-to-right — that must agree on every part. :axioms are the general
+;; (non-path) term-equation form. Both are enforced by katzen.acset.check
+;; (`check-axioms!`) and consumed by the normalizer; `:equations` desugar into
+;; `:axioms` (see katzen.acset.check/path-equation->axiom). The datahike
+;; backend ignores both (they are instance constraints, not storage schema).
 ;;
 ;; katzen.acset.schemas converts a katzen Schema presentation (a
 ;; presentation of ThSchema) into this map. Hand-written schemas are
@@ -57,6 +67,31 @@
   [schema mname]
   (or (some->> (hom-by-name schema mname)  (vector :hom))
       (some->> (attr-by-name schema mname) (vector :attr))))
+
+(defn rename-schema
+  "Apply a renaming `m` (old-name → new-name; identity for names absent from
+   `m`) to every object, attr-type, and morphism name in `schema` — including
+   the dom/codom of homs/attrs and the dom + paths of `:equations`. This is the
+   binding functor: it maps an abstract, backend-agnostic canonical schema onto
+   a store's concrete idents (e.g. {:title :entity/title :employer
+   :entity/employer …}), so one definition can be shared across stores. A pure
+   renaming is an iso of schemas, so instances and equations carry over."
+  [schema m]
+  (let [r #(get m % %)
+        rename-arrow (fn [a] (-> a (update :name r) (update :dom r) (update :codom r)))]
+    (cond-> schema
+      (:name schema)       (update :name r)
+      (:objects schema)    (update :objects    #(mapv r %))
+      (:attr-types schema) (update :attr-types #(mapv r %))
+      (:homs schema)       (update :homs  #(mapv rename-arrow %))
+      (:attrs schema)      (update :attrs #(mapv rename-arrow %))
+      (:equations schema)
+      (update :equations
+              #(mapv (fn [e] (cond-> (-> e (update :dom r)
+                                         (update :lhs (partial mapv r))
+                                         (update :rhs (partial mapv r)))
+                               (:codom e) (update :codom r)))
+                     %)))))
 
 ;; ============================================================================
 ;; IACSet protocol

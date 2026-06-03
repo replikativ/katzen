@@ -139,3 +139,25 @@
                     g)
           [tri-dh _] (build-triangle dh/graph)]
       (is (= 3 (homd/nhomomorphisms-datalog src-vec tri-dh))))))
+
+;; Attr morphisms (typed value columns) — the graph-only tests above miss
+;; these; this exercises the attr-schema installation in the datahike backend.
+(def SchLabeledGraph
+  {:name 'SchLabeledGraph
+   :objects [:V :E]
+   :homs [{:name :src :dom :E :codom :V}
+          {:name :tgt :dom :E :codom :V}]
+   :attr-types [:String :Int]
+   :attrs [{:name :label  :dom :V :codom :String}
+           {:name :weight :dom :V :codom :Int}]})
+
+(deftest test-datahike-attributes-roundtrip
+  (testing "Attr morphisms install + round-trip on the datahike backend"
+    (let [[g [v1 v2]] (a/add-parts (dh/datahike-acset SchLabeledGraph) :V 2)
+          g (-> g
+                (a/set-subpart :label v1 "alpha") (a/set-subpart :weight v1 7)
+                (a/set-subpart :label v2 "beta")  (a/set-subpart :weight v2 9))]
+      (is (= "alpha" (a/subpart g :label v1)) "string attr round-trips")
+      (is (= 7 (a/subpart g :weight v1))       "int attr round-trips")
+      (is (= #{"alpha" "beta"} (set (map second (a/subpart-all g :label)))))
+      (is (= [v2] (a/incident g :label "beta")) "reverse lookup by attr value"))))
