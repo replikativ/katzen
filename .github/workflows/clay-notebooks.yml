@@ -1,4 +1,9 @@
-name: Render Clay Notebooks
+name: Render Clay Notebooks + Playground
+
+# Single GitHub Pages deployment for the whole site:
+#   /            — Clay notebooks index
+#   /playground/ — the ClojureScript string-diagram playground (shadow-cljs release)
+# (Pages serves ONE site; both must deploy from here, or they clobber each other.)
 
 on:
   push:
@@ -7,6 +12,9 @@ on:
       - 'dev/notebooks/**'
       - 'src/**'
       - 'deps.edn'
+      - 'examples/playground.html'
+      - 'package.json'
+      - 'shadow-cljs.edn'
       - '.github/workflows/clay-notebooks.yml'
   workflow_dispatch:
 
@@ -39,6 +47,11 @@ jobs:
         with:
           cli: 1.12.0.1488
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -51,6 +64,11 @@ jobs:
 
       - name: Download Clojure dependencies
         run: clojure -P -M:dev
+
+      - name: Build the string-diagram playground (shadow-cljs release)
+        run: |
+          npm ci
+          npx shadow-cljs release playground
 
       - name: Render Clay notebooks
         run: |
@@ -77,6 +95,7 @@ jobs:
                  <h1>Katzen Notebooks</h1>
                  <p>Walkthroughs rendered from <a href='https://github.com/replikativ/katzen'>source</a>.</p>
                  <ul>
+                   <li><a href='playground/'>String-diagram playground</a> — paste a Clojure <code>defn</code>, see its string diagram (interactive + mermaid)</li>
                    <li><a href='notebooks.comparison_with_catlab.html'>Comparison with Catlab</a> — side-by-side with the Julia stack</li>
                    <li><a href='notebooks.migration_demo.html'>Schema-driven migration</a> — Δ-migration walkthrough</li>
                  </ul></body></html>\")
@@ -84,6 +103,14 @@ jobs:
           (println \"Done.\")
           (System/exit 0)
           "
+
+      - name: Assemble the playground under /playground/
+        run: |
+          mkdir -p _site/playground/dist/playground
+          cp dist/playground/playground.js _site/playground/dist/playground/
+          # Served from /katzen/playground/, so use a relative script path.
+          sed 's#/dist/playground/playground.js#./dist/playground/playground.js#' \
+            examples/playground.html > _site/playground/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

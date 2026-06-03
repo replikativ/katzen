@@ -43,3 +43,6 @@ pom.xml.asc
 # write-ups. Not part of the project's external surface; kept locally for
 # context but not tracked.
 /.internal/
+/node_modules
+/dist
+/.shadow-cljs

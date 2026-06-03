@@ -1,0 +1,9 @@
+{:deps {:aliases [:cljs]}
+ :dev-http {8088 "."}    ; serve repo root → /examples/playground.html + /dist/playground/…
+ :builds
+ {:playground
+  {:target     :browser
+   :output-dir "dist/playground"
+   :asset-path "/dist/playground"
+   :modules    {:playground {:init-fn katzen.playground/init!}}
+   :devtools   {:watch-dir "examples"}}}}

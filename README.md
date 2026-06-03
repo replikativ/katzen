@@ -22,6 +22,11 @@ for typed primitive numerical code.
 The name nods to *Catlab* — `Katzen` is German for cats. A cat lab, a
 category lab, and an honest sibling to Catlab.jl.
 
+**▶ [Try the live playground](https://replikativ.github.io/katzen/playground/)** —
+paste a Clojure `defn` and watch it become a **string diagram** in the browser
+(interactive *or* mermaid, no install). Built on katzen's cross-platform `.cljc`
+core; see [*A category of Clojure programs*](#a-category-of-clojure-programs).
+
 **Quick links**: the [15-minute tutorial](doc/tutorial.md), the
 [concept bridge for Clojurians](doc/for-clojurians.md) (datalog / spec
 / core.async analogies), the
@@ -53,6 +58,15 @@ Concretely, today:
 - **Define a little language, get many interpreters.** A GAT is a DSL; one term
   runs through many algebras — evaluate, pretty-print, cost, compile, draw. (The
   repo even models *a category of Clojure programs*.)
+- **See a function as a string diagram.** `katzen.program` is a functor
+  `⟦·⟧ : defn-body → wiring diagram` (the Clojure analog of Catlab's `@program`):
+  values become wires, calls become boxes, a reused binding *forks* (copy), an
+  unused one *grounds* (delete), a pure box carries a cartesian bead — and, going
+  beyond Catlab's straight-line `@program`, `if`/`fn`/recursion render via
+  Pavlović's monoidal-computer constructs. The
+  **[live playground](https://replikativ.github.io/katzen/playground/)** renders
+  it interactively or as embeddable mermaid; the formalism is in
+  [doc/programs-as-diagrams.md](doc/programs-as-diagrams.md).
 - **Prove a translation is correct.** The `:ansatz` alias checks a schema/theory
   morphism with a Lean kernel — structure-preservation as a proof, not a test.
 
@@ -256,6 +270,50 @@ output is then a theory morphism, kernel-verifiable through ansatz.
 
 See `src/katzen/examples/clojure_core.clj` for the theory and the
 two models in `clojure_eval.clj` / `clojure_symbolic.clj`.
+
+### …and a functor from code to string diagrams
+
+The same idea, turned into a picture. `katzen.program` is a functor
+`⟦·⟧ : defn-body → wiring diagram` — the Clojure analog of Catlab's
+[`@program`](https://github.com/AlgebraicJulia/Catlab.jl/blob/main/src/programs/ParseJuliaPrograms.jl),
+grounded in Dusko Pavlović's *monoidal computer* (*Programs as Diagrams*,
+Springer 2023). A function body is a morphism in a symmetric monoidal
+copy/discard category: **values are wires** (no variable names survive),
+**calls are boxes**, a binding **used twice forks** (copy `Δ`), an **unused
+binding grounds** (delete `▪`), and a **pure/total box carries a cartesian
+bead `•`** — which is exactly what licenses CSE / dead-code elimination.
+
+Where Catlab's `@program` is *straight-line* (no branching), katzen extends it
+with the constructs branching needs, taken from Pavlović rather than invented:
+`if` is **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = {{c}(⌜t⌝, ⌜e⌝)}` (the branches are
+program codes; only the selected one runs), `fn`/HOF are an element of the
+program object `P` plus the universal `run`, and recursion is a Kleene fixpoint
+*rendered* as a trace/feedback loop. Crucially, a pure function and a control
+loop are then *the same kind of object* — a morphism in a monoidal category — so
+the renderer is category-agnostic: the **same** diagram substrate draws a `defn`
+and the sensor→controller→plant loop from
+[*Directed composition*](#directed-composition--feedback-and-control) above.
+
+```clojure
+(require '[katzen.program :as prog])
+
+(prog/fn->mermaid
+  '(defn stats [xs]
+     (let [n     (count xs)
+           total (reduce + 0 xs)
+           mean  (/ total n)
+           unused (first xs)]      ; dropped — grounds, no outgoing wire
+       (vector mean n))))          ; xs forks into count / reduce / first
+;; => a mermaid flowchart: xs fans out, `first` dangles (dead), `+` is impure,
+;;    count/reduce/vector carry the cartesian bead.
+```
+
+**Try it in the browser** — the
+**[live playground](https://replikativ.github.io/katzen/playground/)** parses a
+`defn` and renders the diagram interactively (drag, collapse nested if/fn boxes)
+or as embeddable mermaid you can paste into any markdown. The full construct→
+diagram map, the `ifte` extension, and the semantics-vs-rendering discipline are
+in [doc/programs-as-diagrams.md](doc/programs-as-diagrams.md).
 
 ```clojure
 (require '[katzen.petri :as p])
