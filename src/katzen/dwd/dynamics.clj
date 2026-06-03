@@ -25,6 +25,7 @@
    pays no diagram-traversal cost."
   (:require [katzen.acset :as a]
             [katzen.compile.core :as cc]
+            [katzen.compile.expr :as ce]
             [katzen.dwd :as dwd]))
 
 ;; ============================================================================
@@ -60,6 +61,75 @@
 (defn machine? [x] (instance? Machine x))
 
 ;; ============================================================================
+;; raw-machine — friendly constructor from opaque Clojure closures
+;; ============================================================================
+;;
+;; The `machine` ctor above is low-level (you hand-write the four emit/clj
+;; fns). `raw-machine` is the faithful analog of AlgebraicDynamics'
+;; `ContinuousMachine{T}(ninputs, nstates, noutputs, f, r)`: give it a
+;; dynamics closure and a readout closure and it fills the rest in. Like
+;; `katzen.ode/raw-field`, opaque closures can't be inlined into straight-
+;; line raster code, so a `raw-machine` has NO emit bodies — a composite
+;; containing one runs on the Clojure path (`eval-dynamics` / `signal-rhs`,
+;; or `compile-clojure-rhs` when closed).
+
+(defn- count-of
+  "A spec field that may be a count (int) or a seq of labels → its count."
+  [x] (if (integer? x) x (count x)))
+
+(defn raw-machine
+  "A directed open system from opaque Clojure closures — the friendly,
+   AlgebraicDynamics-style machine constructor.
+
+     (raw-machine
+       {:state-labels [:α :q :θ]
+        :inputs   1                       ; port count, or a label vector
+        :dynamics (fn [u x t] …)           ; u=local state vec, x=input vec
+        :outputs  1                        ; default = (count state-labels)
+        :readout  (fn [u t] …)})           ; default identity → u
+
+   `:dynamics` returns the derivative vector `u̇` (length = #states); `x`
+   carries the values arriving on the input ports, in port order.
+   `:readout` returns the output vector `y` (length = #outputs) and is
+   **state-only** — it may not look at inputs (that is what keeps wiring
+   loop-free). Both default sensibly: readout to identity, `:outputs` to
+   the number of states.
+
+   No raster body (the closures are opaque) — compose with `oapply-dwd`
+   and run via `eval-dynamics` / `signal-rhs`, or `compile-clojure-rhs`
+   once the composite is closed (`n-inputs = 0`)."
+  [{:keys [state-labels inputs outputs dynamics readout]}]
+  (let [state-labels (vec state-labels)
+        n-in   (count-of (or inputs 0))
+        n-out  (count-of (or outputs (count state-labels)))
+        readout (or readout (fn [u _t] u))
+        no-emit (fn [& _]
+                  (throw (ex-info "raw-machine has no raster body — its dynamics/readout are opaque closures; use eval-dynamics / signal-rhs (or compile-clojure-rhs when closed)"
+                                  {:state-labels state-labels})))]
+    (machine
+     {:state-labels state-labels
+      :n-inputs  n-in
+      :n-outputs n-out
+      :dynamics-emit no-emit
+      :readout-emit  no-emit
+      :dynamics-clj
+      (fn [layout]
+        (let [gslots (mapv #(cc/slot layout %) state-labels)
+              n      (count gslots)]
+          (fn [^doubles du ^doubles u ^doubles xs t]
+            (let [local-u  (mapv (fn [^long g] (aget u g)) gslots)
+                  local-du (dynamics local-u (vec xs) t)]
+              (dotimes [i n]
+                (let [g (long (nth gslots i))]
+                  (aset du g (+ (aget du g) (double (nth local-du i))))))))))
+      :readout-clj
+      (fn [layout]
+        (let [gslots (mapv #(cc/slot layout %) state-labels)]
+          (fn [^doubles u t]
+            (let [local-u (mapv (fn [^long g] (aget u g)) gslots)]
+              (vec (readout local-u t))))))})))
+
+;; ============================================================================
 ;; A Machine with n-inputs = 0 is a closed system — it implements
 ;; RasterCompilable directly.
 ;; ============================================================================
@@ -79,6 +149,122 @@
     (let [acc      ((:dynamics-clj m) (:layout m))
           empty-xs (double-array 0)]
       (fn [du u t] (acc du u empty-xs t)))))
+
+;; ============================================================================
+;; vector-machine — friendly constructor from a symbolic field + readout
+;; ============================================================================
+;;
+;; The directed sibling of `katzen.ode/vector-field`. Where `raw-machine`
+;; carries opaque closures (Clojure path only), `vector-machine` takes a
+;; SYMBOLIC field and readout — expressions over the state labels, the
+;; input-port labels, and named parameters — and compiles BOTH the raster
+;; bodies (fast, inlined under composition) and the Clojure bodies. The
+;; readout is **state-only**: a readout expression that names an input
+;; label errors (which is exactly the loop-freeness invariant).
+
+(defn vector-machine
+  "A directed open system from a symbolic field — fast raster path.
+
+     (vector-machine
+       {:state-labels [α q θ]
+        :inputs  [c]                         ; input-port labels, in order
+        :params  {…}
+        :field   {α (+ (* -0.313 α) (* 56.7 q) (* 0.232 c))   ; u̇ per state
+                  q (+ (* -0.013 α) (* -0.426 q) (* 0.0203 c))
+                  θ (* 56.7 q)}
+        :readout [θ]})                        ; one expr per output port
+
+   `:field` maps each state to its time-derivative expression over states,
+   input labels and params (a missing state ⇒ 0). `:readout` is a vector of
+   output expressions over states and params only (defaults to identity —
+   one output per state). Compiles to both numeric paths and composes
+   through `oapply-dwd` like any machine."
+  [{:keys [state-labels inputs params field readout]}]
+  (let [state-labels (vec state-labels)
+        inputs       (vec inputs)
+        params       (or params {})
+        readout      (vec (or readout state-labels))
+        known        (set state-labels)
+        _ (doseq [k (keys field)]
+            (when-not (known k)
+              (throw (ex-info "Field key is not a declared state"
+                              {:label k :states state-labels}))))
+        input-idx    (zipmap inputs (range))
+        ;; leaf resolvers, one per (flavour × phase)
+        dyn-raster-leaf
+        (fn [idx-of input->sym]
+          (fn [sym]
+            (cond
+              (contains? idx-of sym)     (list 'raster.arrays/aget 'u (get idx-of sym))
+              (contains? input->sym sym) (get input->sym sym)
+              (contains? params sym)     (double (get params sym))
+              :else nil)))
+        dyn-clj-leaf
+        (fn [idx-of]
+          (fn [sym]
+            (cond
+              (contains? idx-of sym)   (list 'clojure.core/aget 'u (get idx-of sym))
+              (contains? input-idx sym) (list 'clojure.core/aget 'xs (get input-idx sym))
+              (contains? params sym)   (double (get params sym))
+              :else nil)))
+        ro-leaf-raster
+        (fn [idx-of]
+          (fn [sym]
+            (cond
+              (contains? idx-of sym) (list 'raster.arrays/aget 'u (get idx-of sym))
+              (contains? params sym) (double (get params sym))
+              :else nil)))           ; inputs deliberately absent → readout is state-only
+        ro-leaf-clj
+        (fn [idx-of]
+          (fn [sym]
+            (cond
+              (contains? idx-of sym) (list 'clojure.core/aget 'u (get idx-of sym))
+              (contains? params sym) (double (get params sym))
+              :else nil)))]
+    (machine
+     {:state-labels state-labels
+      :n-inputs  (count inputs)
+      :n-outputs (count readout)
+      :dynamics-emit
+      (fn [layout input-syms]
+        (let [idx-of    (:index-of layout)
+              input->sym (zipmap inputs input-syms)
+              leaf      (dyn-raster-leaf idx-of input->sym)]
+          (vec
+           (for [[label expr] field
+                 :let [g (cc/slot layout label)]]
+             `(raster.arrays/aset
+               ~'du ~g
+               (raster.numeric/+ (raster.arrays/aget ~'du ~g)
+                                 ~(ce/raster-expr expr leaf)))))))
+      :readout-emit
+      (fn [layout output-syms]
+        (let [leaf (ro-leaf-raster (:index-of layout))]
+          (vec
+           (map (fn [out-sym expr] [out-sym (ce/raster-expr expr leaf)])
+                output-syms readout))))
+      :dynamics-clj
+      (fn [layout]
+        (let [idx-of (:index-of layout)
+              leaf   (dyn-clj-leaf idx-of)
+              form   `(fn [~(with-meta 'du {:tag 'doubles})
+                           ~(with-meta 'u {:tag 'doubles})
+                           ~(with-meta 'xs {:tag 'doubles})
+                           ~'t]
+                        ~@(for [[label expr] field
+                                :let [g (cc/slot layout label)]]
+                            `(clojure.core/aset
+                              ~'du ~g
+                              (clojure.core/+ (clojure.core/aget ~'du ~g)
+                                              (double ~(ce/clj-expr expr leaf))))))]
+          (eval form)))
+      :readout-clj
+      (fn [layout]
+        (let [leaf (ro-leaf-clj (:index-of layout))
+              form `(fn [~(with-meta 'u {:tag 'doubles}) ~'t]
+                      [~@(for [expr readout]
+                           `(double ~(ce/clj-expr expr leaf)))])]
+          (eval form)))})))
 
 ;; ============================================================================
 ;; oapply-dwd
@@ -342,3 +528,53 @@
     (->Machine n-inputs n-outputs composite-layout
                composite-dynamics-emit composite-readout-emit
                composite-dynamics-clj  composite-readout-clj)))
+
+;; ============================================================================
+;; Open-machine runtime — simulate a machine driven by input signals
+;; ============================================================================
+;;
+;; A closed machine (n-inputs = 0) implements RasterCompilable and runs
+;; through `compile-rhs` / `compile-clojure-rhs` directly. An OPEN machine
+;; (n-inputs > 0) — e.g. a plant driven by a control input, or a composite
+;; whose outer-inputs are setpoint signals — needs its inputs supplied.
+;; These mirror AlgebraicDynamics' `eval_dynamics` / `readout` / `ODEProblem`.
+
+(defn- input-array
+  "Coerce an `xs` of constants and/or (fn [t]) signals into a double-array
+   of length n-inputs, sampled at time `t`."
+  [m xs t]
+  (when (not= (:n-inputs m) (count xs))
+    (throw (ex-info "wrong number of inputs"
+                    {:expected (:n-inputs m) :got (count xs)})))
+  (double-array (map (fn [x] (double (if (fn? x) (x t) x))) xs)))
+
+(defn eval-dynamics
+  "Evaluate the machine's vector field at state `u`, inputs `xs`, time `t`.
+   Returns the derivative `u̇` as a vector. `xs` is a seq of length
+   `n-inputs` of constants and/or `(fn [t])` signals (sampled at `t`)."
+  [m u xs t]
+  (let [layout (:layout m)
+        n      (:size layout)
+        acc    ((:dynamics-clj m) layout)
+        du     (double-array n)]
+    (acc du (double-array u) (input-array m xs t) t)
+    (vec du)))
+
+(defn readout
+  "The machine's output vector `y` at state `u`, time `t` (state-only)."
+  [m u t]
+  (((:readout-clj m) (:layout m)) (double-array u) t))
+
+(defn signal-rhs
+  "Close a driving signal `xs` over machine `m`, returning a plain
+   `(fn [du u t])` derivative suitable for `katzen.petri/integrate-rk4`
+   (or any raster-free integrator). `xs` is a seq of length `n-inputs`
+   of constants and/or `(fn [t])` signals. Zeros `du` then accumulates,
+   matching the integrator contract."
+  [m xs]
+  (let [layout (:layout m)
+        n      (:size layout)
+        acc    ((:dynamics-clj m) layout)]
+    (fn rhs [^doubles du ^doubles u t]
+      (dotimes [i n] (aset du i 0.0))
+      (acc du u (input-array m xs t) t))))

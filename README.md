@@ -29,6 +29,156 @@ category lab, and an honest sibling to Catlab.jl.
 [Catlab/GATlab comparison notebook](dev/notebooks/comparison_with_catlab.clj)
 (a runnable side-by-side with the Julia stack).
 
+## What can I do with it?
+
+Concretely, today:
+
+- **Keep structured data in datahike and stop hand-writing validation.** Declare
+  a schema — objects, foreign keys, typed columns — and its *invariants* as path
+  equations ("debits equal credits", "no link dangles", "a task's next-state is
+  reachable"). The kernel checks them (`check-axioms!`); your rules live in the
+  schema, not scattered across `assert`s.
+- **Migrate a schema without writing a migration script.** A schema morphism
+  gives Δ-migration in one line — data moves structure-preservingly instead of
+  being silently dropped by an ad-hoc rewrite.
+- **Relate data of different shapes.** Find ACSet homomorphisms ("does this
+  pattern occur in my graph?"), or cross-reference two stores by a shared
+  identity (a URI) — join a ledger to a CRM to a wiki with no bespoke join code.
+- **Aggregate with one fold.** Balances, counts, sums are a commutative-monoid
+  rollup defined once — the same construction for every report.
+- **Model and simulate processes.** Build a Petri net or reaction network (an
+  SIR epidemic, enzyme kinetics, a queue, a population model) with mass-action /
+  Hill / Michaelis–Menten rates; compose subsystems with wiring diagrams
+  (`oapply`); compile to typed numerics and solve the ODEs fast (`:raster`).
+- **Define a little language, get many interpreters.** A GAT is a DSL; one term
+  runs through many algebras — evaluate, pretty-print, cost, compile, draw. (The
+  repo even models *a category of Clojure programs*.)
+- **Prove a translation is correct.** The `:ansatz` alias checks a schema/theory
+  morphism with a Lean kernel — structure-preservation as a proof, not a test.
+
+**When to reach for it:** you have data or processes with real *structure* —
+relations, invariants, several representations that must stay in sync — and you
+want it declared once and then *checked, migrated, related, and simulated* as
+data. (If you just want `Functor`/`Monad` protocols for FP plumbing, that's
+`cats`'s axis — see "What this gives you that `cats` doesn't" below.) A longer
+treatment, with knowledge / code / accounting worked side-by-side, is in
+[doc/schemata.md](doc/schemata.md).
+
+### Composing dynamical systems is tricky — here's the principled way
+
+Wiring subsystems together by hand goes wrong in subtle ways: shared variables
+get duplicated, feedback is ill-defined, and the result isn't reusable. katzen
+uses **operads of wiring diagrams** — a composition *pattern* says how parts
+connect, and `oapply` (an operad algebra, i.e. a functor) computes the
+composite, identifying shared variables correctly.
+
+An SIR epidemic is the composite of two reaction networks that **share the
+infected population** `I` (the same move as Lotka–Volterra sharing its prey):
+
+```clojure
+(require '[katzen.petri :as p] '[katzen.uwd :as uwd] '[katzen.compose :refer [oapply]]
+         '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
+
+;; two primitive reaction networks
+(defn infection [] ; S + I -> 2I   (species 1=S, 2=I)
+  (let [n (p/petri) [n _](p/add-species n) [n _](p/add-species n) [n t](p/add-transition n)
+        [n _](p/add-input n 1 t) [n _](p/add-input n 2 t)
+        [n _](p/add-output n 2 t) [n _](p/add-output n 2 t)] n))
+(defn recovery  [] ; I -> R        (species 1=I, 2=R)
+  (let [n (p/petri) [n _](p/add-species n) [n _](p/add-species n) [n t](p/add-transition n)
+        [n _](p/add-input n 1 t) [n _](p/add-output n 2 t)] n))
+
+;; composition pattern: 3 junctions S,I,R; infection exposes [S I], recovery exposes [I R]
+(let [d (uwd/uwd) [d js] (uwd/add-junctions d 3)
+      [d B1 _] (uwd/add-box-with-ports d (take 2 js))
+      [d B2 _] (uwd/add-box-with-ports d (drop 1 js))
+      ;; oapply identifies the shared I, sums the dynamics → one composite system
+      sir (oapply d {B1 (ud/from-compilable (p/petri-dynamics (infection) {1 (/ 0.3 1000.0)}) [1 2])
+                     B2 (ud/from-compilable (p/petri-dynamics (recovery)  {1 0.1})           [1 2])})
+      rhs (cc/compile-clojure-rhs sir)]
+  (cc/layout-of sir)                                    ; => 3 state classes: S, I, R (I merged, not duplicated)
+  (last (:us (p/integrate-rk4 rhs [999.0 1.0 0.0] 0.0 100.0 0.5))))
+;; => [60 4 936]   the classic epidemic curve, integrated from the composite
+```
+
+The composite is straight-line code (no diagram re-walk per step); add the
+`:raster` alias to compile it to native numerics and solve with `Tsit5`.
+
+Not every system is a clean mass-action net — textbook **Lotka–Volterra** has
+independent birth/predation/death rates. For those, `katzen.ode/vector-field`
+gives you a system from a symbolic field (still compiles to the fast raster
+path), and `katzen.ode/raw-field` from an arbitrary Clojure closure (the
+faithful analog of AlgebraicDynamics' raw-function resource sharer). Both
+compose through the *same* `oapply` — predator–prey is growth + predation +
+death **sharing the prey and predator populations**:
+
+```clojure
+(require '[katzen.ode :as ode] '[katzen.uwd :as uwd] '[katzen.petri :as p]
+         '[katzen.compose :refer [oapply]] '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
+
+(let [growth    (ode/vector-field {:states '[r]   :params '{a 1.1} :field '{r (* a r)}})
+      predation (ode/vector-field {:states '[r f] :params '{b 0.4 d 0.1}
+                                   :field  '{r (- (* b r f)) f (* d r f)}})
+      death     (ode/vector-field {:states '[f]   :params '{g 0.4} :field '{f (- (* g f))}})
+      d (uwd/uwd) [d [jR jF]] (uwd/add-junctions d 2)
+      [d Bg _] (uwd/add-box-with-ports d [jR])      ; growth touches the prey R
+      [d Bp _] (uwd/add-box-with-ports d [jR jF])   ; predation couples R and F
+      [d Bd _] (uwd/add-box-with-ports d [jF])      ; death touches the predator F
+      lv  (oapply d {Bg (ud/from-compilable growth    '[r])
+                     Bp (ud/from-compilable predation '[r f])
+                     Bd (ud/from-compilable death     '[f])})]
+  (cc/layout-of lv)   ; => 2 state classes: R, F (prey/predator merged across the 3 boxes)
+  (last (:us (p/integrate-rk4 (cc/compile-clojure-rhs lv) [10.0 10.0] 0.0 20.0 0.001))))
+;; the composite conserves the LV first integral to ~1e-12 — a correct closed orbit
+```
+
+### Directed composition — feedback and control
+
+The examples above are **undirected**: boxes share variables, no causal
+direction. The other half is **directed** — *machines* with input ports, output
+ports, and a state-only **readout**; wires feed outputs to inputs, so feedback is
+well-defined. This is the substrate for control systems (sensor → controller →
+plant → back). `katzen.dwd.dynamics` gives you `raw-machine` (opaque closure) and
+`vector-machine` (symbolic, fast raster path) — the directed siblings of
+`raw-field` / `vector-field` — composed with the same `oapply`.
+
+A minimal closed loop: a plant (integrator `ẋ = u`) and a first-order controller
+tracking the error `r − x`, wired so the plant's output feeds **back** into the
+controller and the setpoint `r` is the outer input:
+
+```clojure
+(require '[katzen.dwd :as dwd] '[katzen.dwd.dynamics :as m] '[katzen.petri :as p]
+         '[katzen.compose :refer [oapply]])
+
+(def plant (m/raw-machine {:state-labels [:x] :inputs 1                ; ẋ = u
+                           :dynamics (fn [[x] [u] _] [u]) :readout (fn [[x] _] [x])}))
+(def ctrl  (m/raw-machine {:state-labels [:c] :inputs 2                ; ins: [x, setpoint r]
+                           :dynamics (fn [[c] [x r] _] [(* 10.0 (- (- r x) c))])
+                           :readout  (fn [[c] _] [c])}))
+
+(def feedback-loop                         ; controller→plant, plant→controller (feedback)
+  (let [d (dwd/dwd)
+        [d Bp pin pout] (dwd/add-box-with-ports d 1 1)
+        [d Bc cin cout] (dwd/add-box-with-ports d 2 1)
+        [d r] (dwd/add-outer-in-port d) [d y] (dwd/add-outer-out-port d)
+        [d _] (dwd/add-box-wire    d (nth cout 0) (nth pin 0))   ; controller → plant
+        [d _] (dwd/add-box-wire    d (nth pout 0) (nth cin 0))   ; plant x → controller (feedback)
+        [d _] (dwd/add-input-wire  d r (nth cin 1))              ; setpoint → controller
+        [d _] (dwd/add-output-wire d (nth pout 0) y)]
+    (oapply d {Bp plant Bc ctrl})))           ; same oapply as the undirected examples
+
+;; drive with setpoint r = 1 and integrate — the closed loop tracks it:
+(last (:us (p/integrate-rk4 (m/signal-rhs feedback-loop [1.0]) (double-array [0.0 0.0]) 0.0 10.0 0.01)))
+;; => [1.0 0.0]   x reaches the commanded setpoint, error eliminated
+```
+
+A full sensor + controller + plant UAV pitch loop (a port of AlgebraicDynamics'
+cyber-physical example, Bakirtzis et al.) is in
+[`test-raster/katzen/dwd/control_test.clj`](test-raster/katzen/dwd/control_test.clj).
+**Open Petri nets → ODE** as a functor work the same way. See
+[doc/composition.md](doc/composition.md) for the full story (and why naive
+composition fails).
+
 ## Define a category
 
 A *generalized algebraic theory* (GAT) is the data shape Katzen uses
@@ -204,9 +354,11 @@ clojure -M:dev:raster:ansatz -m notebooks.comparison-with-catlab
 | Symbolic normalization | `katzen.acset.normalize`, `katzen.symbolic.normalize` `normalize`, `equiv?` | [GATlab.jl `GATExprUtils`](https://github.com/AlgebraicJulia/GATlab.jl/blob/main/src/models/GATExprUtils.jl) |
 | Lean-kernel verification | `katzen.ansatz.export`, `katzen.acset.theory-bridge` `check-theory!`, `verify-schema-morphism!`, `verified-migrate` | none — GATlab's `TheoryMaps.jl:256` has an open TODO |
 | FinSet (co)limits | `katzen.finset.limits`, `katzen.finset.colimits` `product`, `pullback`, `coproduct`, `pushout` | [Catlab.jl `FinSet` limits](https://github.com/AlgebraicJulia/Catlab.jl/tree/main/src/categorical_algebra/setcats) |
+| Operadic composition (unified) | `katzen.compose` `oapply` — one entry over all operads × algebras | [Catlab/AlgebraicDynamics `oapply`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl) (multiple dispatch) |
 | UWD composition | `katzen.uwd.dynamics` `uwd`, `oapply` | [AlgebraicDynamics.jl `uwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
-| DWD composition | `katzen.dwd.dynamics` `dwd`, `oapply-dwd`, `machine` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
+| DWD composition (directed / control) | `katzen.dwd.dynamics` `oapply-dwd`, `raw-machine`, `vector-machine`, `eval-dynamics`, `signal-rhs` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
 | Circular port graphs | `katzen.cpg` | [AlgebraicDynamics.jl `cpg_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/cpg_dynam.jl) |
+| Vector fields (non-net dynamics) | `katzen.ode` `vector-field` (symbolic), `raw-field` (closure) | [AlgebraicDynamics.jl `ContinuousResourceSharer`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
 | Petri nets | `katzen.petri` `petri`, `petri-dynamics`, `integrate-rk4`, `migrate-dynamics` | [AlgebraicPetri.jl](https://github.com/AlgebraicJulia/AlgebraicPetri.jl) |
 | Reaction networks | `katzen.reaction` `reaction-network`, `reaction-dynamics` (mass-action, Michaelis-Menten, Hill, `:expr`) | [Catalyst.jl](https://github.com/SciML/Catalyst.jl) |
 | Numerical compile | `katzen.compile.core` `RasterCompilable`, `compile-rhs`, `compile-clojure-rhs` | [AlgebraicPetri.jl `vectorfield_expr`](https://github.com/AlgebraicJulia/AlgebraicPetri.jl/blob/main/src/AlgebraicPetri.jl) (via `GeneralizedGenerated.mk_function`) |

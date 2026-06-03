@@ -93,6 +93,28 @@
                                (:codom e) (update :codom r)))
                      %)))))
 
+(defn merge-schema
+  "Extend `base` schema with `ext`: the union of their objects, attr-types,
+   homs, attrs and equations (objects/attr-types deduped by value; homs/attrs
+   deduped by `:name`, base winning). The dual of `rename-schema` for sharing:
+   a general base schema (e.g. a generic knowledge graph) is EXTENDED by a
+   consumer with its domain-specific morphisms, rather than the domain leaking
+   into the base. `(rename-schema (merge-schema base ext) idents)` is the usual
+   bind-an-extended-schema flow."
+  [base ext]
+  (let [by-name (fn [xs]                       ; order-preserving dedup by :name (base wins)
+                  (second (reduce (fn [[seen acc] a]
+                                    (if (seen (:name a)) [seen acc]
+                                        [(conj seen (:name a)) (conj acc a)]))
+                                  [#{} []] xs)))
+        dedup   (fn [xs] (vec (distinct xs)))]
+    (-> base
+        (update :objects    #(dedup (concat % (:objects ext))))
+        (update :attr-types #(dedup (concat % (:attr-types ext))))
+        (update :homs       #(by-name (concat % (:homs ext))))
+        (update :attrs      #(by-name (concat % (:attrs ext))))
+        (update :equations  #(vec (concat % (:equations ext)))))))
+
 ;; ============================================================================
 ;; IACSet protocol
 ;; ============================================================================

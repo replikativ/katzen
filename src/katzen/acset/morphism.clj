@@ -163,9 +163,11 @@
 ;; ============================================================================
 
 (defn compose
-  "Composition of two ACSet morphisms φ: X → Y and ψ: Y → Z. Returns
-   ψ ∘ φ : X → Z whose components are pointwise composition.
-   Requires `(:tgt φ) = (:src ψ)`."
+  "Composition of two ACSet morphisms. DIAGRAMMATIC order, the shared
+   katzen convention (see `katzen.cat/compose`): the FIRST argument is
+   applied first. `(compose φ ψ)` with φ: X → Y and ψ: Y → Z returns
+   X → Z acting as `ψ(φ(p))` (classical `ψ ∘ φ`); requires
+   `(:tgt φ) = (:src ψ)`."
   [phi psi]
   (when-not (identical? (:tgt phi) (:src psi))
     (throw (ex-info "ACSet morphism compose: tgt(φ) must equal src(ψ)"
