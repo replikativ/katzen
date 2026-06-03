@@ -30,10 +30,11 @@
 
    Both are bare `RasterCompilable`s. To use them as boxes in a UWD,
    lift with `katzen.uwd.dynamics/from-compilable` and declare ports."
-  (:require [katzen.compile.core :as cc]))
+  (:require [katzen.compile.core :as cc]
+            [katzen.compile.expr :as ce]))
 
 ;; ============================================================================
-;; Expression compiler (shared by both bodies of a vector-field)
+;; Expression leaves (state read / param literal) for both flavours
 ;; ============================================================================
 ;;
 ;; A field expression is ordinary Clojure-shaped arithmetic over:
@@ -42,51 +43,27 @@
 ;;   - numeric literals  → double literals
 ;;   - operator forms (op arg …) → `+ - * /` plus host calls (Math/pow …)
 ;;
-;; We emit two flavours from the same expr: a raster flavour using the
-;; typed `raster.numeric` / `raster.arrays` ops (matching what
-;; `katzen.petri` emits), and a vanilla Clojure flavour.
+;; `katzen.compile.expr` walks the form; these `leaf` fns resolve the
+;; symbols, differing only in how a state read is spelled (raster `aget`
+;; vs clojure `aget`). A state label → a read at the layout slot; a
+;; parameter symbol → a double literal.
 
-(def ^:private raster-binops
-  '{+ raster.numeric/+, - raster.numeric/-, * raster.numeric/*, / raster.numeric//})
+(defn- raster-leaf [idx-of params]
+  (fn [sym]
+    (cond
+      (contains? idx-of sym) (list 'raster.arrays/aget 'u (get idx-of sym))
+      (contains? params sym) (double (get params sym))
+      :else nil)))
 
-(defn- fold-binary
-  "Left-fold an n-ary op down to nested binary calls: (op a b c) →
-   (op (op a b) c). raster.numeric ops are binary."
-  [op args]
-  (reduce (fn [a b] (list op a b)) args))
+(defn- clj-leaf [idx-of params]
+  (fn [sym]
+    (cond
+      (contains? idx-of sym) (list 'clojure.core/aget 'u (get idx-of sym))
+      (contains? params sym) (double (get params sym))
+      :else nil)))
 
-(defn- raster-expr
-  "Compile a field expression to raster source. `idx-of` maps state
-   labels to their (global) slot in the state vector named `u`."
-  [expr idx-of params]
-  (cond
-    (contains? idx-of expr) (list 'raster.arrays/aget 'u (get idx-of expr))
-    (contains? params expr) (double (get params expr))
-    (number? expr)          (double expr)
-    (seq? expr)
-    (let [[op & args] expr
-          cargs       (mapv #(raster-expr % idx-of params) args)]
-      (if-let [rop (get raster-binops op)]
-        (cond
-          (and (= op '-) (= 1 (count cargs))) (list rop 0.0 (first cargs))
-          (and (= op '/) (= 1 (count cargs))) (list rop 1.0 (first cargs))
-          :else                               (fold-binary rop cargs))
-        (cons op cargs)))                ; host passthrough, e.g. (Math/pow x 2)
-    :else
-    (throw (ex-info "Unsupported vector-field expression" {:expr expr}))))
-
-(defn- clj-expr
-  "Compile a field expression to vanilla Clojure source over the
-   double-array `u` (clojure.core ops are variadic, so no folding)."
-  [expr idx-of params]
-  (cond
-    (contains? idx-of expr) (list 'clojure.core/aget 'u (get idx-of expr))
-    (contains? params expr) (double (get params expr))
-    (number? expr)          (double expr)
-    (seq? expr)             (cons (first expr)
-                                  (map #(clj-expr % idx-of params) (rest expr)))
-    :else
-    (throw (ex-info "Unsupported vector-field expression" {:expr expr}))))
+(defn- raster-expr [expr idx-of params] (ce/raster-expr expr (raster-leaf idx-of params)))
+(defn- clj-expr    [expr idx-of params] (ce/clj-expr    expr (clj-leaf    idx-of params)))
 
 ;; ============================================================================
 ;; vector-field (symbolic) — RasterCompilable with BOTH bodies

@@ -87,6 +87,45 @@ predation + death over both.
   well-defined. Overview of all three algebras:
   [Libkind 2020](https://arxiv.org/abs/2007.14442).
 
+### Directed machines = control systems
+
+A **machine** is `(state u, inputs x, outputs y, dynamics u̇ = f(u,x,t),
+readout y = r(u,t))`. The **readout is state-only** — it may not see the inputs —
+and that is exactly what makes wiring an output to an input well-posed (no
+algebraic loops). This is the half of the formalism that carries control: a
+controller reads a plant's output (its readout) and drives the plant's input; an
+observer is a machine whose readout is a state estimate; feedback is a wire from
+a downstream output back to an upstream input. The undirected (resource-sharing)
+side structurally *cannot* express this — it has no notion of causal direction or
+readout.
+
+katzen gives two friendly machine constructors, the directed siblings of
+`katzen.ode`'s field constructors:
+
+- **`raw-machine`** — `{:dynamics (fn [u x t] → u̇), :readout (fn [u t] → y)}`,
+  the faithful analog of AlgebraicDynamics' `ContinuousMachine{T}(ninputs,
+  nstates, noutputs, f, r)`. Opaque closures ⇒ Clojure path.
+- **`vector-machine`** — a *symbolic* field + readout over states, input labels
+  and params; compiles to both the raster and Clojure paths (again doing more
+  than the closures-only Julia).
+
+An open machine (with inputs) is simulated by supplying its inputs:
+`eval-dynamics` / `readout` evaluate it pointwise, and `signal-rhs` closes a
+driving signal (constants or `(fn [t])`) over it to produce an ODE RHS for the
+integrator. A *closed* composite (no outer inputs) is `RasterCompilable`
+directly. The README shows a minimal plant + controller feedback loop; a full
+sensor + controller + plant UAV pitch loop — a port of AlgebraicDynamics'
+cyber-physical example
+([Bakirtzis et al. 2021](https://doi.org/10.1145/3461669)) — is validated in
+`test-raster/katzen/dwd/control_test.clj` (the composite reproduces the
+hand-written monolithic 5-state ODE to machine precision).
+
+Beyond C, the directed layer is the substrate for **assume-guarantee contracts**
+(compositional safety verification, Bakirtzis et al.) and **categorical model-
+predictive control** (Patterson, Fairbanks, Hanks, She, Hale, Klawonn, *Modeling
+Model Predictive Control: A Category Theoretic Framework for Multistage Control
+Problems*, 2024) — natural next layers on top of machines.
+
 ## Translation is functorial too
 
 Composition's twin is *translation* — and it's also functors, which is why a

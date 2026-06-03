@@ -132,8 +132,49 @@ death **sharing the prey and predator populations**:
 ;; the composite conserves the LV first integral to ~1e-12 — a correct closed orbit
 ```
 
-Directed composition (input/output **machines** with readouts) and **open Petri
-nets → ODE** as a functor work the same way. See
+### Directed composition — feedback and control
+
+The examples above are **undirected**: boxes share variables, no causal
+direction. The other half is **directed** — *machines* with input ports, output
+ports, and a state-only **readout**; wires feed outputs to inputs, so feedback is
+well-defined. This is the substrate for control systems (sensor → controller →
+plant → back). `katzen.dwd.dynamics` gives you `raw-machine` (opaque closure) and
+`vector-machine` (symbolic, fast raster path) — the directed siblings of
+`raw-field` / `vector-field` — composed with `oapply-dwd`.
+
+A minimal closed loop: a plant (integrator `ẋ = u`) and a first-order controller
+tracking the error `r − x`, wired so the plant's output feeds **back** into the
+controller and the setpoint `r` is the outer input:
+
+```clojure
+(require '[katzen.dwd :as dwd] '[katzen.dwd.dynamics :as m] '[katzen.petri :as p])
+
+(def plant (m/raw-machine {:state-labels [:x] :inputs 1                ; ẋ = u
+                           :dynamics (fn [[x] [u] _] [u]) :readout (fn [[x] _] [x])}))
+(def ctrl  (m/raw-machine {:state-labels [:c] :inputs 2                ; ins: [x, setpoint r]
+                           :dynamics (fn [[c] [x r] _] [(* 10.0 (- (- r x) c))])
+                           :readout  (fn [[c] _] [c])}))
+
+(def feedback-loop                         ; controller→plant, plant→controller (feedback)
+  (let [d (dwd/dwd)
+        [d Bp pin pout] (dwd/add-box-with-ports d 1 1)
+        [d Bc cin cout] (dwd/add-box-with-ports d 2 1)
+        [d r] (dwd/add-outer-in-port d) [d y] (dwd/add-outer-out-port d)
+        [d _] (dwd/add-box-wire    d (nth cout 0) (nth pin 0))   ; controller → plant
+        [d _] (dwd/add-box-wire    d (nth pout 0) (nth cin 0))   ; plant x → controller (feedback)
+        [d _] (dwd/add-input-wire  d r (nth cin 1))              ; setpoint → controller
+        [d _] (dwd/add-output-wire d (nth pout 0) y)]
+    (m/oapply-dwd d {Bp plant Bc ctrl})))
+
+;; drive with setpoint r = 1 and integrate — the closed loop tracks it:
+(last (:us (p/integrate-rk4 (m/signal-rhs feedback-loop [1.0]) (double-array [0.0 0.0]) 0.0 10.0 0.01)))
+;; => [1.0 0.0]   x reaches the commanded setpoint, error eliminated
+```
+
+A full sensor + controller + plant UAV pitch loop (a port of AlgebraicDynamics'
+cyber-physical example, Bakirtzis et al.) is in
+[`test-raster/katzen/dwd/control_test.clj`](test-raster/katzen/dwd/control_test.clj).
+**Open Petri nets → ODE** as a functor work the same way. See
 [doc/composition.md](doc/composition.md) for the full story (and why naive
 composition fails).
 
@@ -313,7 +354,7 @@ clojure -M:dev:raster:ansatz -m notebooks.comparison-with-catlab
 | Lean-kernel verification | `katzen.ansatz.export`, `katzen.acset.theory-bridge` `check-theory!`, `verify-schema-morphism!`, `verified-migrate` | none — GATlab's `TheoryMaps.jl:256` has an open TODO |
 | FinSet (co)limits | `katzen.finset.limits`, `katzen.finset.colimits` `product`, `pullback`, `coproduct`, `pushout` | [Catlab.jl `FinSet` limits](https://github.com/AlgebraicJulia/Catlab.jl/tree/main/src/categorical_algebra/setcats) |
 | UWD composition | `katzen.uwd.dynamics` `uwd`, `oapply` | [AlgebraicDynamics.jl `uwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
-| DWD composition | `katzen.dwd.dynamics` `dwd`, `oapply-dwd`, `machine` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
+| DWD composition (directed / control) | `katzen.dwd.dynamics` `oapply-dwd`, `raw-machine`, `vector-machine`, `eval-dynamics`, `signal-rhs` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
 | Circular port graphs | `katzen.cpg` | [AlgebraicDynamics.jl `cpg_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/cpg_dynam.jl) |
 | Vector fields (non-net dynamics) | `katzen.ode` `vector-field` (symbolic), `raw-field` (closure) | [AlgebraicDynamics.jl `ContinuousResourceSharer`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
 | Petri nets | `katzen.petri` `petri`, `petri-dynamics`, `integrate-rk4`, `migrate-dynamics` | [AlgebraicPetri.jl](https://github.com/AlgebraicJulia/AlgebraicPetri.jl) |
