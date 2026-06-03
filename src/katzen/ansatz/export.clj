@@ -275,8 +275,8 @@
     (try
       (binding [a/*verbose* false]
         (a-ind/define-inductive original-env ind-name-str
-                                params-spec ctors-spec
-                                :no-confusion? false))
+          params-spec ctors-spec
+          :no-confusion? false))
       (let [env (a/env)
             struct-ci (a-env/lookup env (a-name/from-string ind-name-str))]
         (f env struct-ci))
@@ -605,9 +605,9 @@
            (try
              (binding [a/*verbose* false]
                (a-ind/define-inductive original-env (struct-name codom)
-                                       (gat->params-spec codom)
-                                       (gat->ctors-spec codom)
-                                       :no-confusion? false))
+                 (gat->params-spec codom)
+                 (gat->ctors-spec codom)
+                 :no-confusion? false))
              (let [env (a/env)]
                (vec
                 (for [ax (:axioms dom)

@@ -22,113 +22,113 @@
 
   ;; Literal constructors
   (term lit-num
-    :args [n Expr]
-    :ret Expr)
+        :args [n Expr]
+        :ret Expr)
 
   (term lit-str
-    :args [s Expr]
-    :ret Expr)
+        :args [s Expr]
+        :ret Expr)
 
   (term lit-bool
-    :args [b Expr]
-    :ret Expr)
+        :args [b Expr]
+        :ret Expr)
 
   (term lit-nil
-    :ret Expr)
+        :ret Expr)
 
   ;; Variables
   (term var
-    :args [name Expr]
-    :ret Expr)
+        :args [name Expr]
+        :ret Expr)
 
   ;; Functions (multi-arity)
   (term fn-expr
-    :args [params Expr, body Expr]
-    :ret Expr)
+        :args [params Expr, body Expr]
+        :ret Expr)
 
   ;; Application (multi-argument)
   (term app
-    :args [fn-expr Expr, args Expr]
-    :ret Expr)
+        :args [fn-expr Expr, args Expr]
+        :ret Expr)
 
   ;; Let binding (single binding for simplicity)
   (term let-expr
-    :args [name Expr, val Expr, body Expr]
-    :ret Expr)
+        :args [name Expr, val Expr, body Expr]
+        :ret Expr)
 
   ;; Recursive let (letrec)
   (term letrec-expr
-    :args [name Expr, params Expr, body Expr, in-expr Expr]
-    :ret Expr)
+        :args [name Expr, params Expr, body Expr, in-expr Expr]
+        :ret Expr)
 
   ;; Conditionals
   (term if-expr
-    :args [test Expr, then-expr Expr, else-expr Expr]
-    :ret Expr)
+        :args [test Expr, then-expr Expr, else-expr Expr]
+        :ret Expr)
 
   ;; Sequencing
   (term do-expr
-    :args [expr1 Expr, expr2 Expr]
-    :ret Expr)
+        :args [expr1 Expr, expr2 Expr]
+        :ret Expr)
 
   ;; Primitives (represented as values)
   (term prim-add
-    :ret Expr)
+        :ret Expr)
 
   (term prim-sub
-    :ret Expr)
+        :ret Expr)
 
   (term prim-mul
-    :ret Expr)
+        :ret Expr)
 
   (term prim-div
-    :ret Expr)
+        :ret Expr)
 
   (term prim-eq
-    :ret Expr)
+        :ret Expr)
 
   (term prim-lt
-    :ret Expr)
+        :ret Expr)
 
   (term prim-gt
-    :ret Expr)
+        :ret Expr)
 
   ;; Data structure literals
   (term lit-vec
-    :args [elems Expr]
-    :ret Expr)
+        :args [elems Expr]
+        :ret Expr)
 
   (term lit-map
-    :args [kvs Expr]
-    :ret Expr)
+        :args [kvs Expr]
+        :ret Expr)
 
   ;; Data structure operations
   (term prim-nth
-    :ret Expr)
+        :ret Expr)
 
   (term prim-count
-    :ret Expr)
+        :ret Expr)
 
   (term prim-conj
-    :ret Expr)
+        :ret Expr)
 
   (term prim-get
-    :ret Expr)
+        :ret Expr)
 
   (term prim-assoc
-    :ret Expr)
+        :ret Expr)
 
   ;; Environment operations (used by models)
   (term empty-env
-    :ret Env)
+        :ret Env)
 
   (term extend-env
-    :args [env Env, name Expr, val Value]
-    :ret Env)
+        :args [env Env, name Expr, val Value]
+        :ret Env)
 
   (term lookup-env
-    :args [env Env, name Expr]
-    :ret Value)
+        :args [env Env, name Expr]
+        :ret Value)
 
   ;; NO AXIOMS!
   ;; This is a free theory - models define semantics

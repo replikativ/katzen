@@ -73,7 +73,7 @@
         (let [new-args (mapv #(if (scope/gat-ident? %)
                                 (substitute-ident ident-map %)
                                 (substitute-in-type ident-map %))
-                            (:args type))]
+                             (:args type))]
           (core/alg-type head-result new-args (:sort type)))))
     type))
 
@@ -83,14 +83,14 @@
   (if (core/alg-term? term)
     (let [new-head (substitute-ident ident-map (:head term))
           new-args (mapv #(cond
-                           (scope/gat-ident? %)
-                           (substitute-ident ident-map %)
+                            (scope/gat-ident? %)
+                            (substitute-ident ident-map %)
 
-                           (core/alg-term? %)
-                           (substitute-in-term ident-map %)
+                            (core/alg-term? %)
+                            (substitute-in-term ident-map %)
 
-                           :else %)
-                        (:args term))
+                            :else %)
+                         (:args term))
           new-type (substitute-in-type ident-map (:type term))]
       (if (core/alg-term? new-head)
         ;; If head was substituted with a term, compose them
@@ -118,9 +118,9 @@
      (if-let [mapped (get mapping ident)]
        ;; Extract the actual type/term from the TypeInCtx/TermInCtx
        (let [mapped-value (cond
-                           (core/type-in-ctx? mapped) (:type mapped)
-                           (core/term-in-ctx? mapped) (:term mapped)
-                           :else mapped)]
+                            (core/type-in-ctx? mapped) (:type mapped)
+                            (core/term-in-ctx? mapped) (:term mapped)
+                            :else mapped)]
          (assoc acc ident mapped-value))
        acc))
    {}
@@ -146,9 +146,9 @@
         ;; 1. Map type constructors from type-map
         ;; 2. Map context variables
         type-ident-map (into {}
-                            (map (fn [[k v]]
-                                   [k (:type v)])
-                                 type-map))
+                             (map (fn [[k v]]
+                                    [k (:type v)])
+                                  type-map))
         ctx-ident-map (build-ident-map type-map ctx)
         ident-map (merge type-ident-map ctx-ident-map)
 
@@ -179,13 +179,13 @@
         ;; 1. Map type/term constructors
         ;; 2. Map context variables
         type-ident-map (into {}
-                            (map (fn [[k v]]
-                                   [k (:type v)])
-                                 type-map))
+                             (map (fn [[k v]]
+                                    [k (:type v)])
+                                  type-map))
         term-ident-map (into {}
-                            (map (fn [[k v]]
-                                   [k (:term v)])
-                                 term-map))
+                             (map (fn [[k v]]
+                                    [k (:term v)])
+                                  term-map))
         ctx-type-map (build-ident-map type-map ctx)
         ctx-term-map (build-ident-map term-map ctx)
         ident-map (merge type-ident-map term-ident-map ctx-type-map ctx-term-map)
@@ -354,19 +354,19 @@
   (let [sb (StringBuilder.)]
     (.append sb (str "Morphism: " (:name morphism) "\n"))
     (.append sb (str "  " (:name (:dom morphism)) " => "
-                    (:name (:codom morphism)) "\n\n"))
+                     (:name (:codom morphism)) "\n\n"))
 
     (when (seq (:type-map morphism))
       (.append sb "Type Mappings:\n")
       (doseq [[dom-ident codom-tic] (:type-map morphism)]
         (.append sb (str "  " (:name dom-ident) " => "
-                        (-> codom-tic :type :head :name) "\n"))))
+                         (-> codom-tic :type :head :name) "\n"))))
 
     (when (seq (:term-map morphism))
       (.append sb "\nTerm Mappings:\n")
       (doseq [[dom-ident codom-tic] (:term-map morphism)]
         (.append sb (str "  " (:name dom-ident) " => "
-                        (-> codom-tic :term :head :name) "\n"))))
+                         (-> codom-tic :term :head :name) "\n"))))
 
     (str sb)))
 

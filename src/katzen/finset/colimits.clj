@@ -169,7 +169,7 @@
                    (let [root (some (fn [[r idx]] (when (= idx k) r)) class-of)
                          ;; Find any b with roots-by-elem[b] = root.
                          b    (first (keep-indexed (fn [b r] (when (= r root) b))
-                                                    roots-by-elem))]
+                                                   roots-by-elem))]
                      (fs/app h b))))]
     (fs/fin-function out (fs/cod h))))
 

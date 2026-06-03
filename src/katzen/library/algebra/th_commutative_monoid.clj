@@ -23,25 +23,25 @@
   (type M)
 
   (term mul
-    :args [x M, y M]
-    :ret M)
+        :args [x M, y M]
+        :ret M)
 
   (term unit
-    :ret M)
+        :ret M)
 
   (axiom associativity
-    :ctx [x M, y M, z M]
-    (= (mul (mul x y) z)
-       (mul x (mul y z))))
+         :ctx [x M, y M, z M]
+         (= (mul (mul x y) z)
+            (mul x (mul y z))))
 
   (axiom left-unit
-    :ctx [x M]
-    (= (mul (unit) x) x))
+         :ctx [x M]
+         (= (mul (unit) x) x))
 
   (axiom right-unit
-    :ctx [x M]
-    (= (mul x (unit)) x))
+         :ctx [x M]
+         (= (mul x (unit)) x))
 
   (axiom commutativity
-    :ctx [x M, y M]
-    (= (mul x y) (mul y x))))
+         :ctx [x M, y M]
+         (= (mul x y) (mul y x))))

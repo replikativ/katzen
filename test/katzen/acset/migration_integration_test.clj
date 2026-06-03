@@ -141,17 +141,17 @@
   (testing "The migration_demo pipeline produces stable shapes at every stage."
     (if-not demo-available?
       (ts/skip-notice "notebooks.migration-demo")
-    (let [network-fn (resolve 'notebooks.migration-demo/road-network)
-          network   (network-fn)
-          topology  (m/migrate gg/ForgetWeight network)
-          reversed  (m/migrate m/OpGraph topology)]
-      (is (= 4 (a/nv topology)))
-      (is (= 6 (a/ne topology)))
-      (is (= a/SchGraph (a/schema topology)))
-      (is (nil? (a/subpart topology :weight 1))
-          "weight column is gone after ForgetWeight")
-      (is (= 4 (a/nv reversed)))
-      (is (= 6 (a/ne reversed)))
-      (is (= #{[2 1] [3 2] [4 3] [1 4] [3 1] [4 2]}
-             (edge-set reversed))
-          "edges are exactly the reversal of the original road network")))))
+      (let [network-fn (resolve 'notebooks.migration-demo/road-network)
+            network   (network-fn)
+            topology  (m/migrate gg/ForgetWeight network)
+            reversed  (m/migrate m/OpGraph topology)]
+        (is (= 4 (a/nv topology)))
+        (is (= 6 (a/ne topology)))
+        (is (= a/SchGraph (a/schema topology)))
+        (is (nil? (a/subpart topology :weight 1))
+            "weight column is gone after ForgetWeight")
+        (is (= 4 (a/nv reversed)))
+        (is (= 6 (a/ne reversed)))
+        (is (= #{[2 1] [3 2] [4 3] [1 4] [3 1] [4 2]}
+               (edge-set reversed))
+            "edges are exactly the reversal of the original road network")))))

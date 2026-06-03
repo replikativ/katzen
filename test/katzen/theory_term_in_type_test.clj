@@ -16,12 +16,12 @@
   (type Hom [dom Ob, codom Ob])
 
   (term otimes
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term braid
-    :ctx [a Ob, b Ob]
-    :ret (Hom (otimes a b) (otimes b a))))
+        :ctx [a Ob, b Ob]
+        :ret (Hom (otimes a b) (otimes b a))))
 
 (deftest test-simple-monoidal-category
   (testing "Can define theory with term applications in type arguments"
@@ -70,12 +70,12 @@
   (type Hom [dom Ob, codom Ob])
 
   (term otimes
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term associator
-    :ctx [a Ob, b Ob, c Ob]
-    :ret (Hom (otimes (otimes a b) c) (otimes a (otimes b c)))))
+        :ctx [a Ob, b Ob, c Ob]
+        :ret (Hom (otimes (otimes a b) c) (otimes a (otimes b c)))))
 
 (deftest test-nested-term-applications
   (testing "Can handle nested term applications like (otimes (otimes a b) c)"
@@ -126,19 +126,19 @@
   (type Hom [dom Ob, codom Ob])
 
   (term otimes
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term munit
-    :ret Ob)
+        :ret Ob)
 
   (term left-unitor
-    :ctx [a Ob]
-    :ret (Hom (otimes munit a) a))
+        :ctx [a Ob]
+        :ret (Hom (otimes munit a) a))
 
   (term right-unitor
-    :ctx [a Ob]
-    :ret (Hom (otimes a munit) a)))
+        :ctx [a Ob]
+        :ret (Hom (otimes a munit) a)))
 
 (deftest test-multiple-term-constructors
   (testing "Can use multiple different term constructors in type arguments"
@@ -172,13 +172,13 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (deftest test-backwards-compatibility
   (testing "Old-style type arguments (just symbols) still work"
@@ -225,8 +225,8 @@
                             (type Hom [dom Ob, codom Ob])
 
                             (term foo
-                              :ctx [a Ob]
-                              :ret (Hom (undefined-term a) a))))
+                                  :ctx [a Ob]
+                                  :ret (Hom (undefined-term a) a))))
                    nil
                    (catch Throwable t t))]
       (is (some? thrown) "the bad theory must throw")
@@ -240,12 +240,12 @@
                             (type Hom [dom Ob, codom Ob])
 
                             (term otimes
-                              :ctx [a Ob, b Ob]
-                              :ret Ob)
+                                  :ctx [a Ob, b Ob]
+                                  :ret Ob)
 
                             (term bad
-                              :ctx [a Ob]
-                              :ret (Hom (otimes a undefined-var) a))))
+                                  :ctx [a Ob]
+                                  :ret (Hom (otimes a undefined-var) a))))
                    nil
                    (catch Throwable t t))]
       (is (some? thrown))

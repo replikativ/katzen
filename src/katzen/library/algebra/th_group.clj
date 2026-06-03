@@ -25,33 +25,33 @@
   (type G)
 
   (term mul
-    :args [x G, y G]
-    :ret G)
+        :args [x G, y G]
+        :ret G)
 
   (term unit
-    :ret G)
+        :ret G)
 
   (term inv
-    :args [x G]
-    :ret G)
+        :args [x G]
+        :ret G)
 
   (axiom associativity
-    :ctx [x G, y G, z G]
-    (= (mul (mul x y) z)
-       (mul x (mul y z))))
+         :ctx [x G, y G, z G]
+         (= (mul (mul x y) z)
+            (mul x (mul y z))))
 
   (axiom left-unit
-    :ctx [x G]
-    (= (mul (unit) x) x))
+         :ctx [x G]
+         (= (mul (unit) x) x))
 
   (axiom right-unit
-    :ctx [x G]
-    (= (mul x (unit)) x))
+         :ctx [x G]
+         (= (mul x (unit)) x))
 
   (axiom left-inverse
-    :ctx [x G]
-    (= (mul (inv x) x) (unit)))
+         :ctx [x G]
+         (= (mul (inv x) x) (unit)))
 
   (axiom right-inverse
-    :ctx [x G]
-    (= (mul x (inv x)) (unit))))
+         :ctx [x G]
+         (= (mul x (inv x)) (unit))))

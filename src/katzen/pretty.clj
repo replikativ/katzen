@@ -115,15 +115,15 @@
                [(str "  (term " term-name)]
                (when (seq ctx)
                  [(str "    :ctx [" (str/join ", "
-                                               (map (fn [[ident type-expr]]
-                                                      (render-context-binding ident type-expr :unicode? unicode?))
-                                                    ctx))
+                                              (map (fn [[ident type-expr]]
+                                                     (render-context-binding ident type-expr :unicode? unicode?))
+                                                   ctx))
                        "]")])
                (when (seq args)
                  [(str "    :args [" (str/join ", "
-                                                (map (fn [[ident type-expr]]
-                                                       (render-context-binding ident type-expr :unicode? unicode?))
-                                                     args))
+                                               (map (fn [[ident type-expr]]
+                                                      (render-context-binding ident type-expr :unicode? unicode?))
+                                                    args))
                        "]")])
                [(str "    :ret " (render-type-expr ret-type :unicode? unicode?) ")")]))))
 

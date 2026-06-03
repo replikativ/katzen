@@ -51,13 +51,13 @@
   (type → [dom Ob, codom Ob])  ; Unicode arrow instead of Hom
 
   (term ⋅                      ; Unicode compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (→ a b), g (→ b c)]
-    :ret (→ a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (→ a b), g (→ b c)]
+        :ret (→ a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (→ a a)))
+        :ctx [a Ob]
+        :ret (→ a a)))
 
 (deftest test-unicode-theory-definition
   (testing "Theory with unicode operators is valid"
@@ -87,13 +87,13 @@
   (type → [dom Ob, codom Ob])  ; Unicode type name
 
   (term compose                ; ASCII term name
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (→ a b), g (→ b c)]  ; Unicode in usage
-    :ret (→ a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (→ a b), g (→ b c)]  ; Unicode in usage
+        :ret (→ a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))            ; ASCII Hom also works
+        :ctx [a Ob]
+        :ret (Hom a a)))            ; ASCII Hom also works
 
 (deftest test-mixed-unicode-ascii
   (testing "Can mix unicode and ASCII in same theory"
@@ -116,36 +116,36 @@
   (type → [dom Ob, codom Ob])
 
   (term ⋅
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (→ a b), g (→ b c)]
-    :ret (→ a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (→ a b), g (→ b c)]
+        :ret (→ a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (→ a a))
+        :ctx [a Ob]
+        :ret (→ a a))
 
   (term ⊗
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term I
-    :ret Ob)
+        :ret Ob)
 
   (term α
-    :ctx [a Ob, b Ob, c Ob]
-    :ret (→ (⊗ (⊗ a b) c) (⊗ a (⊗ b c))))
+        :ctx [a Ob, b Ob, c Ob]
+        :ret (→ (⊗ (⊗ a b) c) (⊗ a (⊗ b c))))
 
   (term λ
-    :ctx [a Ob]
-    :ret (→ (⊗ I a) a))
+        :ctx [a Ob]
+        :ret (→ (⊗ I a) a))
 
   (term ρ
-    :ctx [a Ob]
-    :ret (→ (⊗ a I) a))
+        :ctx [a Ob]
+        :ret (→ (⊗ a I) a))
 
   (term σ
-    :ctx [a Ob, b Ob]
-    :ret (→ (⊗ a b) (⊗ b a))))
+        :ctx [a Ob, b Ob]
+        :ret (→ (⊗ a b) (⊗ b a))))
 
 (deftest test-unicode-smc
   (testing "Full SMC with unicode is valid"
@@ -182,13 +182,13 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (deftest test-ascii-still-works
   (testing "Pure ASCII syntax still works"

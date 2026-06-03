@@ -13,23 +13,23 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (theory/deftheory ThMonoid
   (type M)
 
   (term mul
-    :args [x M, y M]
-    :ret M)
+        :args [x M, y M]
+        :ret M)
 
   (term unit
-    :ret M))
+        :ret M))
 
 ;;; ============================================================================
 ;;; Test: IModel Protocol
@@ -125,27 +125,27 @@
 
   (Ob [_model args]
     ;; Ob is nullary (arity 0)
-    true)
+      true)
 
   (Hom [_model args]
-    (let [[dom cod] args]
+       (let [[dom cod] args]
       ;; In FinSet, Hom from dom to cod exists if both are positive integers
-      (and (integer? dom) (pos? dom)
-           (integer? cod) (pos? cod))))
+         (and (integer? dom) (pos? dom)
+              (integer? cod) (pos? cod))))
 
   (compose [_model args]
     ;; compose takes: a, b, c (implicit type params), f, g (explicit args)
     ;; In FinSet: f and g are vectors representing functions
     ;; f : a → b, g : b → c
     ;; Result: f;g : a → c (composition)
-    (let [[a b c f g] args]
-      (mapv #(nth g (dec %)) f)))
+           (let [[a b c f g] args]
+             (mapv #(nth g (dec %)) f)))
 
   (id [_model args]
     ;; id takes: a (the object)
     ;; Returns identity morphism on a (represented as [1, 2, ..., a])
-    (let [[a] args]
-      (vec (range 1 (inc a))))))
+      (let [[a] args]
+        (vec (range 1 (inc a))))))
 
 (deftest test-finset-category-model
   (testing "Can create FinSet category model"
@@ -213,15 +213,15 @@
 
   (M [_model args]
     ;; M is nullary type constructor
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (str x y)))
+       (let [[x y] args]
+         (str x y)))
 
   (unit [_model args]
     ;; unit is nullary
-    ""))
+        ""))
 
 (deftest test-string-monoid-model
   (testing "Can create string monoid model"

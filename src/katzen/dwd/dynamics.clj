@@ -32,11 +32,11 @@
 ;; ============================================================================
 
 (defrecord Machine
-  [n-inputs n-outputs layout
-   dynamics-emit   ;; (layout, input-syms) → seq of forms accumulating into du
-   readout-emit    ;; (layout, output-syms) → seq of [sym form] let-bindings
-   dynamics-clj    ;; (layout) → (fn [du u xs t])
-   readout-clj])   ;; (layout) → (fn [u t] → vec of n-outputs doubles)
+           [n-inputs n-outputs layout
+            dynamics-emit   ;; (layout, input-syms) → seq of forms accumulating into du
+            readout-emit    ;; (layout, output-syms) → seq of [sym form] let-bindings
+            dynamics-clj    ;; (layout) → (fn [du u xs t])
+            readout-clj])   ;; (layout) → (fn [u t] → vec of n-outputs doubles)
 
 (defn machine
   "Construct a Machine from a spec map.
@@ -225,7 +225,7 @@
                       boxes)
                 ro-bindings  (emit-readout-bindings layout box-readout-syms)
                 in-bindings  (emit-box-input-bindings box-readout-syms box-input-syms
-                                                     outer-in-syms)
+                                                      outer-in-syms)
                 dyn-blocks   (emit-dynamics-blocks layout box-input-syms)]
             [`(let [~@(mapcat identity ro-bindings)
                     ~@(mapcat identity in-bindings)]

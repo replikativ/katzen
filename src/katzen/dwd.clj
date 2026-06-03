@@ -96,7 +96,7 @@
   [d src-op tgt-ip]
   (let [[d w] (a/add-part d :Wire)]
     [(-> d (a/set-subpart :src-op w src-op)
-           (a/set-subpart :tgt-ip w tgt-ip)) w]))
+         (a/set-subpart :tgt-ip w tgt-ip)) w]))
 
 (defn add-input-wire
   "Connect outer-input port `src-oi` to box input port `tgt-ip` —
@@ -104,7 +104,7 @@
   [d src-oi tgt-ip]
   (let [[d w] (a/add-part d :Wire)]
     [(-> d (a/set-subpart :src-outer-in w src-oi)
-           (a/set-subpart :tgt-ip w tgt-ip)) w]))
+         (a/set-subpart :tgt-ip w tgt-ip)) w]))
 
 (defn add-output-wire
   "Connect box output port `src-op` to outer-output port `tgt-oo` —
@@ -112,7 +112,7 @@
   [d src-op tgt-oo]
   (let [[d w] (a/add-part d :Wire)]
     [(-> d (a/set-subpart :src-op w src-op)
-           (a/set-subpart :tgt-outer-out w tgt-oo)) w]))
+         (a/set-subpart :tgt-outer-out w tgt-oo)) w]))
 
 ;; ============================================================================
 ;; Accessors

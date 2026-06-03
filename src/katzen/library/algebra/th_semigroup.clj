@@ -18,10 +18,10 @@
   (type S)
 
   (term mul
-    :args [x S, y S]
-    :ret S)
+        :args [x S, y S]
+        :ret S)
 
   (axiom associativity
-    :ctx [x S, y S, z S]
-    (= (mul (mul x y) z)
-       (mul x (mul y z)))))
+         :ctx [x S, y S, z S]
+         (= (mul (mul x y) z)
+            (mul x (mul y z)))))

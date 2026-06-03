@@ -106,8 +106,8 @@
 (def ThMonoid-leftassoc
   (assoc std/ThMonoid :axioms
          (mapv (fn [ax] (if (= 'assoc (:name ax))
-                         (assoc ax :canonical :lhs)
-                         ax))
+                          (assoc ax :canonical :lhs)
+                          ax))
                (:axioms std/ThMonoid))))
 
 (def assoc-ax (find-axiom std/ThMonoid 'assoc))

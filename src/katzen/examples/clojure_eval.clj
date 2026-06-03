@@ -44,10 +44,10 @@
          :body body
          :env (merge env (zipmap params arg-vals))}
         (throw (ex-info "Arity mismatch"
-                       {:expected (count params)
-                        :got (count arg-vals)
-                        :params params
-                        :args arg-vals}))))
+                        {:expected (count params)
+                         :got (count arg-vals)
+                         :params params
+                         :args arg-vals}))))
 
     :primitive
     {:eval-needed false
@@ -72,145 +72,145 @@
   (Expr [_model args] true)
   (Value [_model args] true)
   (Env [_model args]
-    (let [[env] args]
-      (or (nil? env) (map? env))))
+       (let [[env] args]
+         (or (nil? env) (map? env))))
 
   ;; Literals - just return the wrapped value
   (lit-num [_model args]
-    (let [[n] args] n))
+           (let [[n] args] n))
 
   (lit-str [_model args]
-    (let [[s] args] s))
+           (let [[s] args] s))
 
   (lit-bool [_model args]
-    (let [[b] args] b))
+            (let [[b] args] b))
 
   (lit-nil [_model args]
-    nil)
+           nil)
 
   ;; Variables - lookup in environment
   (var [_model args]
-    (let [[name env] args]
-      (if (contains? env name)
-        (get env name)
-        (throw (ex-info "Unbound variable" {:var name :env env})))))
+       (let [[name env] args]
+         (if (contains? env name)
+           (get env name)
+           (throw (ex-info "Unbound variable" {:var name :env env})))))
 
   ;; Functions - create closure (multi-arity)
   (fn-expr [_model args]
-    (let [[params body env] args]
-      (make-closure params body env)))
+           (let [[params body env] args]
+             (make-closure params body env)))
 
   ;; Application - evaluate function and arguments, then apply (multi-arity)
   (app [model args]
-    (let [[fn-expr arg-exprs env] args
+       (let [[fn-expr arg-exprs env] args
           ;; Evaluate function and arguments
-          fn-val (eval-expr model fn-expr env)
-          arg-vals (mapv #(eval-expr model % env) arg-exprs)
+             fn-val (eval-expr model fn-expr env)
+             arg-vals (mapv #(eval-expr model % env) arg-exprs)
           ;; Apply
-          result (apply-value fn-val arg-vals)]
-      (if (:eval-needed result)
+             result (apply-value fn-val arg-vals)]
+         (if (:eval-needed result)
         ;; Need to evaluate body in extended env
-        (eval-expr model (:body result) (:env result))
+           (eval-expr model (:body result) (:env result))
         ;; Primitive already computed result
-        (:value result))))
+           (:value result))))
 
   ;; Let - evaluate binding value, extend env, evaluate body
   (let-expr [model args]
-    (let [[name val-expr body env] args
-          val (eval-expr model val-expr env)
-          new-env (assoc env name val)]
-      (eval-expr model body new-env)))
+            (let [[name val-expr body env] args
+                  val (eval-expr model val-expr env)
+                  new-env (assoc env name val)]
+              (eval-expr model body new-env)))
 
   ;; Letrec - recursive let binding
   (letrec-expr [model args]
-    (let [[name params fn-body in-expr env] args
+               (let [[name params fn-body in-expr env] args
           ;; Create a placeholder for the recursive reference
-          rec-closure (atom nil)
+                     rec-closure (atom nil)
           ;; Create closure with environment that will contain itself
-          closure {:type :closure
-                   :params params
-                   :body fn-body
-                   :env (assoc env name rec-closure)}]
+                     closure {:type :closure
+                              :params params
+                              :body fn-body
+                              :env (assoc env name rec-closure)}]
       ;; Fill in the recursive reference
-      (reset! rec-closure closure)
+                 (reset! rec-closure closure)
       ;; Evaluate the in-expr with the recursive function bound
-      (eval-expr model in-expr (assoc env name closure))))
+                 (eval-expr model in-expr (assoc env name closure))))
 
   ;; If - evaluate test, then branch based on truthiness
   (if-expr [model args]
-    (let [[test then-expr else-expr env] args
-          test-val (eval-expr model test env)]
-      (if (truthy? test-val)
-        (eval-expr model then-expr env)
-        (eval-expr model else-expr env))))
+           (let [[test then-expr else-expr env] args
+                 test-val (eval-expr model test env)]
+             (if (truthy? test-val)
+               (eval-expr model then-expr env)
+               (eval-expr model else-expr env))))
 
   ;; Do - evaluate expr1 for side effects, return expr2
   (do-expr [model args]
-    (let [[expr1 expr2 env] args]
-      (eval-expr model expr1 env)  ; Evaluate but discard
-      (eval-expr model expr2 env)))
+           (let [[expr1 expr2 env] args]
+             (eval-expr model expr1 env)  ; Evaluate but discard
+             (eval-expr model expr2 env)))
 
   ;; Primitives - return primitive values
   (prim-add [_model args]
-    (make-primitive +))
+            (make-primitive +))
 
   (prim-sub [_model args]
-    (make-primitive -))
+            (make-primitive -))
 
   (prim-mul [_model args]
-    (make-primitive *))
+            (make-primitive *))
 
   (prim-div [_model args]
-    (make-primitive /))
+            (make-primitive /))
 
   (prim-eq [_model args]
-    (make-primitive =))
+           (make-primitive =))
 
   (prim-lt [_model args]
-    (make-primitive <))
+           (make-primitive <))
 
   (prim-gt [_model args]
-    (make-primitive >))
+           (make-primitive >))
 
   ;; Data structure literals
   (lit-vec [model args]
-    (let [[elems env] args]
-      (vec (map #(eval-expr model % env) elems))))
+           (let [[elems env] args]
+             (vec (map #(eval-expr model % env) elems))))
 
   (lit-map [model args]
-    (let [[kvs env] args]
-      (into {} (map (fn [[k v]]
-                      [(eval-expr model k env)
-                       (eval-expr model v env)])
-                    kvs))))
+           (let [[kvs env] args]
+             (into {} (map (fn [[k v]]
+                             [(eval-expr model k env)
+                              (eval-expr model v env)])
+                           kvs))))
 
   ;; Data structure operations
   (prim-nth [_model args]
-    (make-primitive nth))
+            (make-primitive nth))
 
   (prim-count [_model args]
-    (make-primitive count))
+              (make-primitive count))
 
   (prim-conj [_model args]
-    (make-primitive conj))
+             (make-primitive conj))
 
   (prim-get [_model args]
-    (make-primitive get))
+            (make-primitive get))
 
   (prim-assoc [_model args]
-    (make-primitive assoc))
+              (make-primitive assoc))
 
   ;; Environment operations
   (empty-env [_model args]
-    {})
+             {})
 
   (extend-env [_model args]
-    (let [[env name val] args]
-      (assoc env name val)))
+              (let [[env name val] args]
+                (assoc env name val)))
 
   (lookup-env [_model args]
-    (let [[env name] args]
-      (get env name))))
+              (let [[env name] args]
+                (get env name))))
 
 ;; Helper function to evaluate expressions
 ;; This dispatches based on the expression's :head field

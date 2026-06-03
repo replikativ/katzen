@@ -14,33 +14,33 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (theory/deftheory UnicodeSMC
   (type Ob)
   (type → [dom Ob, codom Ob])
 
   (term ⋅
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (→ a b), g (→ b c)]
-    :ret (→ a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (→ a b), g (→ b c)]
+        :ret (→ a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (→ a a))
+        :ctx [a Ob]
+        :ret (→ a a))
 
   (term ⊗
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term I
-    :ret Ob))
+        :ret Ob))
 
 ;;; ============================================================================
 ;;; Type Expression Rendering Tests
@@ -49,7 +49,7 @@
 (deftest test-render-type-expr-simple
   (testing "Simple type variables render correctly"
     (let [ob-type (first (filter #(= 'Ob (-> % :type :head :name))
-                                  (:type-constructors PrettySimpleCategory)))
+                                 (:type-constructors PrettySimpleCategory)))
           ob-expr (:type ob-type)]
       ;; ASCII rendering
       (is (= "Ob" (pretty/render-type-expr ob-expr :unicode? false)))
@@ -59,10 +59,10 @@
 (deftest test-render-type-expr-application
   (testing "Type applications render correctly"
     (let [hom-type (first (filter #(= 'Hom (-> % :type :head :name))
-                                   (:type-constructors PrettySimpleCategory)))
+                                  (:type-constructors PrettySimpleCategory)))
           ;; Get the type of the compose term to test rendering
           compose-term (first (filter #(= 'compose (-> % :term :head :name))
-                                       (:term-constructors PrettySimpleCategory)))
+                                      (:term-constructors PrettySimpleCategory)))
           hom-expr (-> compose-term :term :type)]
       ;; ASCII rendering
       (is (str/includes? (pretty/render-type-expr hom-expr :unicode? false) "Hom"))
@@ -76,14 +76,14 @@
 (deftest test-render-term-ascii
   (testing "Terms render with ASCII names"
     (let [compose-term (first (filter #(= 'compose (-> % :term :head :name))
-                                       (:term-constructors PrettySimpleCategory)))]
+                                      (:term-constructors PrettySimpleCategory)))]
       (let [rendered (pretty/render-term compose-term :unicode? false :show-type? false)]
         (is (= "compose" rendered))))))
 
 (deftest test-render-term-unicode
   (testing "Terms render with unicode names"
     (let [compose-term (first (filter #(= 'compose (-> % :term :head :name))
-                                       (:term-constructors UnicodeSMC)))]
+                                      (:term-constructors UnicodeSMC)))]
       (let [rendered (pretty/render-term compose-term :unicode? true :show-type? false)]
         (is (= "⋅" rendered))))))
 
@@ -159,7 +159,7 @@
 (deftest test-empty-context
   (testing "Terms with no context render correctly"
     (let [i-term (first (filter #(= 'munit (-> % :term :head :name))
-                                 (:term-constructors UnicodeSMC)))
+                                (:term-constructors UnicodeSMC)))
           rendered (pretty/render-term-constructor i-term :unicode? true)]
       (is (str/includes? rendered "I"))
       (is (str/includes? rendered ":ret Ob")))))

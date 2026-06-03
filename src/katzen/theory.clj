@@ -312,14 +312,14 @@
         ;; Parse context bindings
         ctx-bindings (when ctx (partition 2 ctx))
         [state-with-ctx term-ctx] (if ctx-bindings
-                                     (parse-context state ctx-bindings)
-                                     [state (core/type-ctx)])
+                                    (parse-context state ctx-bindings)
+                                    [state (core/type-ctx)])
 
         ;; Parse argument bindings in the context (extending it)
         arg-bindings (when args (partition 2 args))
         [state-with-args full-ctx] (if arg-bindings
-                                      (parse-context state-with-ctx arg-bindings term-ctx)
-                                      [state-with-ctx term-ctx])
+                                     (parse-context state-with-ctx arg-bindings term-ctx)
+                                     [state-with-ctx term-ctx])
 
         ;; Parse return type
         [state-final ret-type] (parse-type-expr state-with-args ret)
@@ -363,13 +363,13 @@
           ;; Parse context
           ctx-bindings (when ctx (partition 2 ctx))
           [state-with-ctx axiom-ctx] (if ctx-bindings
-                                        (parse-context state ctx-bindings)
-                                        [state (core/type-ctx)])
+                                       (parse-context state ctx-bindings)
+                                       [state (core/type-ctx)])
 
           ;; Parse LHS and RHS (they need a type - we'll use a dummy type for now)
           ;; In a real implementation, we'd infer the type
           dummy-type (core/alg-type (scope/ident (:tag (:gat state)) 999 'DUMMY)
-                                     [] core/TYPE)
+                                    [] core/TYPE)
           [state-lhs lhs] (parse-term-expr state-with-ctx lhs-expr dummy-type)
           [state-rhs rhs] (parse-term-expr state-with-ctx rhs-expr dummy-type)
 
@@ -536,7 +536,7 @@
          ~(str "Internal protocol for " theory-name " (collection-based)")
          ~@(for [ctor-name all-ctors]
              `(~(symbol (str "-" ctor-name)) [~'model ~'args]
-                ~(str "Internal method for " ctor-name))))
+                                             ~(str "Internal method for " ctor-name))))
 
        ;; Generate wrapper functions with correct arities
        ~@(for [[ctor-name tic] ctor-tic-map]
@@ -566,10 +566,10 @@
   (when (pos? (core/context-length ctx))
     (str "["
          (str/join ", "
-                              (map (fn [i t]
-                                     (str (:name i) " : " (format-type t)))
-                                   (:idents ctx)
-                                   (:types ctx)))
+                   (map (fn [i t]
+                          (str (:name i) " : " (format-type t)))
+                        (:idents ctx)
+                        (:types ctx)))
          "]")))
 
 (defn format-theory

@@ -47,27 +47,27 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a))
+        :ctx [a Ob]
+        :ret (Hom a a))
 
   (axiom assoc
-    :ctx [a Ob, b Ob, c Ob, d Ob,
-          f (Hom a b), g (Hom b c), h (Hom c d)]
-    (= (compose a c d (compose a b c f g) h)
-       (compose a b d f (compose b c d g h))))
+         :ctx [a Ob, b Ob, c Ob, d Ob,
+               f (Hom a b), g (Hom b c), h (Hom c d)]
+         (= (compose a c d (compose a b c f g) h)
+            (compose a b d f (compose b c d g h))))
 
   (axiom id-left
-    :ctx [a Ob, b Ob, f (Hom a b)]
-    (= (compose a a b (id a) f) f))
+         :ctx [a Ob, b Ob, f (Hom a b)]
+         (= (compose a a b (id a) f) f))
 
   (axiom id-right
-    :ctx [a Ob, b Ob, f (Hom a b)]
-    (= (compose a b b f (id b)) f)))
+         :ctx [a Ob, b Ob, f (Hom a b)]
+         (= (compose a b b f (id b)) f)))
 
 ;;; ============================================================================
 ;;; Symmetric Monoidal Category Theory
@@ -85,34 +85,34 @@
 
   ;; Monoidal structure on objects
   (term otimes
-    :ctx [a Ob, b Ob]
-    :ret Ob)
+        :ctx [a Ob, b Ob]
+        :ret Ob)
 
   (term munit
-    :ret Ob)
+        :ret Ob)
 
   ;; Monoidal structure on morphisms
   (term otimes-hom
-    :ctx [a Ob, b Ob, c Ob, d Ob]
-    :args [f (Hom a c), g (Hom b d)]
-    :ret (Hom (otimes a b) (otimes c d)))
+        :ctx [a Ob, b Ob, c Ob, d Ob]
+        :args [f (Hom a c), g (Hom b d)]
+        :ret (Hom (otimes a b) (otimes c d)))
 
   ;; Structural isomorphisms
   (term associator
-    :ctx [a Ob, b Ob, c Ob]
-    :ret (Hom (otimes (otimes a b) c) (otimes a (otimes b c))))
+        :ctx [a Ob, b Ob, c Ob]
+        :ret (Hom (otimes (otimes a b) c) (otimes a (otimes b c))))
 
   (term left-unitor
-    :ctx [a Ob]
-    :ret (Hom (otimes munit a) a))
+        :ctx [a Ob]
+        :ret (Hom (otimes munit a) a))
 
   (term right-unitor
-    :ctx [a Ob]
-    :ret (Hom (otimes a munit) a))
+        :ctx [a Ob]
+        :ret (Hom (otimes a munit) a))
 
   (term braid
-    :ctx [a Ob, b Ob]
-    :ret (Hom (otimes a b) (otimes b a))))
+        :ctx [a Ob, b Ob]
+        :ret (Hom (otimes a b) (otimes b a))))
 
 ;;; ============================================================================
 ;;; Schema Theory — foundation for ACSets
@@ -136,21 +136,21 @@
   (type Attr [dom Ob, codom AttrType])
 
   (term compose-attr
-    :ctx [a Ob, b Ob, x AttrType]
-    :args [f (Hom a b), g (Attr b x)]
-    :ret (Attr a x))
+        :ctx [a Ob, b Ob, x AttrType]
+        :args [f (Hom a b), g (Attr b x)]
+        :ret (Attr a x))
 
   (axiom attr-assoc
-    :ctx [a Ob, b Ob, c Ob, x AttrType,
-          f (Hom a b), g (Hom b c), h (Attr c x)]
+         :ctx [a Ob, b Ob, c Ob, x AttrType,
+               f (Hom a b), g (Hom b c), h (Attr c x)]
     ;; LHS: f ∘ (g ∘ h) — outer compose-attr is Hom A B × Attr B X → Attr A X
     ;; RHS: (f ∘ g) ∘ h — outer compose-attr is Hom A C × Attr C X → Attr A X
-    (= (compose-attr a b x f (compose-attr b c x g h))
-       (compose-attr a c x (compose a b c f g) h)))
+         (= (compose-attr a b x f (compose-attr b c x g h))
+            (compose-attr a c x (compose a b c f g) h)))
 
   (axiom attr-id-left
-    :ctx [a Ob, x AttrType, h (Attr a x)]
-    (= (compose-attr a a x (id a) h) h)))
+         :ctx [a Ob, x AttrType, h (Attr a x)]
+         (= (compose-attr a a x (id a) h) h)))
 
 ;;; ============================================================================
 ;;; Monoid Theory
@@ -171,24 +171,24 @@
   (type El)
 
   (term mul
-    :ctx [x El, y El]
-    :ret El)
+        :ctx [x El, y El]
+        :ret El)
 
   (term unit
-    :ret El)
+        :ret El)
 
   (axiom assoc
-    :ctx [x El, y El, z El]
-    (= (mul (mul x y) z)
-       (mul x (mul y z))))
+         :ctx [x El, y El, z El]
+         (= (mul (mul x y) z)
+            (mul x (mul y z))))
 
   (axiom unit-left
-    :ctx [x El]
-    (= (mul (unit) x) x))
+         :ctx [x El]
+         (= (mul (unit) x) x))
 
   (axiom unit-right
-    :ctx [x El]
-    (= (mul x (unit)) x)))
+         :ctx [x El]
+         (= (mul x (unit)) x)))
 
 ;;; ============================================================================
 ;;; Group Theory
@@ -209,16 +209,16 @@
   (using ThMonoid)
 
   (term inv
-    :ctx [x El]
-    :ret El)
+        :ctx [x El]
+        :ret El)
 
   (axiom inv-left
-    :ctx [x El]
-    (= (mul (inv x) x) (unit)))
+         :ctx [x El]
+         (= (mul (inv x) x) (unit)))
 
   (axiom inv-right
-    :ctx [x El]
-    (= (mul x (inv x)) (unit))))
+         :ctx [x El]
+         (= (mul x (inv x)) (unit))))
 
 ;;; ============================================================================
 ;;; Pretty Printing

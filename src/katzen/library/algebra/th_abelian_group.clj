@@ -35,5 +35,5 @@
   (using katzen.library.algebra.th-group/ThGroup)
 
   (axiom commutativity
-    :ctx [x G, y G]
-    (= (mul x y) (mul y x))))
+         :ctx [x G, y G]
+         (= (mul x y) (mul y x))))

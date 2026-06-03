@@ -171,9 +171,9 @@
          (let [resolved-protocol# (resolve '~qualified-protocol-name)]
            (when-not resolved-protocol#
              (throw (ex-info (str "Protocol not found: " '~qualified-protocol-name
-                                 ". Did you define the theory with deftheory?")
-                            {:protocol '~qualified-protocol-name
-                             :theory '~theory-sym}))))
+                                  ". Did you define the theory with deftheory?")
+                             {:protocol '~qualified-protocol-name
+                              :theory '~theory-sym}))))
 
          ;; Define the model record (without protocol extension)
          (defrecord ~record-name [~'theory-ref ~'type-map ~'model-type]
@@ -266,9 +266,9 @@
          (let [resolved-protocol# (resolve '~qualified-protocol-name)]
            (when-not resolved-protocol#
              (throw (ex-info (str "Protocol not found: " '~qualified-protocol-name
-                                 ". Did you define the theory with deftheory?")
-                            {:protocol '~qualified-protocol-name
-                             :theory '~theory-sym}))))
+                                  ". Did you define the theory with deftheory?")
+                             {:protocol '~qualified-protocol-name
+                              :theory '~theory-sym}))))
 
          ;; Define the model record (without protocol extension)
          (defrecord ~record-name [~'theory-ref ~'options ~'model-type]

@@ -160,35 +160,35 @@
       ;; Let - name binds in body, but val-expr evaluated in outer scope
       :let-expr (let [[name val-expr body] (:args expr)]
                   (set/union (free-vars val-expr)
-                            (set/difference (free-vars body) #{name})))
+                             (set/difference (free-vars body) #{name})))
 
       ;; Letrec - name binds in both fn-body and in-expr
       :letrec-expr (let [[name params fn-body in-expr] (:args expr)]
                      (set/difference
-                       (set/union
+                      (set/union
                          ;; Free vars in function body (minus params)
-                         (set/difference (free-vars fn-body) (set params))
+                       (set/difference (free-vars fn-body) (set params))
                          ;; Free vars in in-expr
-                         (free-vars in-expr))
+                       (free-vars in-expr))
                        ;; Minus the recursive name
-                       #{name}))
+                      #{name}))
 
       ;; If - union of all branches
       :if-expr (let [[test then-expr else-expr] (:args expr)]
                  (set/union (free-vars test)
-                           (free-vars then-expr)
-                           (free-vars else-expr)))
+                            (free-vars then-expr)
+                            (free-vars else-expr)))
 
       ;; Do - union of both expressions
       :do-expr (let [[expr1 expr2] (:args expr)]
                  (set/union (free-vars expr1)
-                           (free-vars expr2)))
+                            (free-vars expr2)))
 
       ;; Primitives - no free vars (they're built-in)
       (:prim-add :prim-sub :prim-mul :prim-div
-       :prim-eq :prim-lt :prim-gt
-       :prim-nth :prim-count :prim-conj
-       :prim-get :prim-assoc) #{}
+                 :prim-eq :prim-lt :prim-gt
+                 :prim-nth :prim-count :prim-conj
+                 :prim-get :prim-assoc) #{}
 
       ;; Data structures - union of element free vars
       :lit-vec (let [[elems] (:args expr)]
@@ -228,28 +228,28 @@
 
       :let-expr (let [[name val-expr body] (:args expr)]
                   (set/union #{name}
-                            (bound-vars val-expr)
-                            (bound-vars body)))
+                             (bound-vars val-expr)
+                             (bound-vars body)))
 
       :letrec-expr (let [[name params fn-body in-expr] (:args expr)]
                      (set/union #{name}
-                               (set params)
-                               (bound-vars fn-body)
-                               (bound-vars in-expr)))
+                                (set params)
+                                (bound-vars fn-body)
+                                (bound-vars in-expr)))
 
       :if-expr (let [[test then-expr else-expr] (:args expr)]
                  (set/union (bound-vars test)
-                           (bound-vars then-expr)
-                           (bound-vars else-expr)))
+                            (bound-vars then-expr)
+                            (bound-vars else-expr)))
 
       :do-expr (let [[expr1 expr2] (:args expr)]
                  (set/union (bound-vars expr1)
-                           (bound-vars expr2)))
+                            (bound-vars expr2)))
 
       (:prim-add :prim-sub :prim-mul :prim-div
-       :prim-eq :prim-lt :prim-gt
-       :prim-nth :prim-count :prim-conj
-       :prim-get :prim-assoc) #{}
+                 :prim-eq :prim-lt :prim-gt
+                 :prim-nth :prim-count :prim-conj
+                 :prim-get :prim-assoc) #{}
 
       :lit-vec (let [[elems] (:args expr)]
                  (apply set/union #{} (map bound-vars elems)))
@@ -292,7 +292,7 @@
           :prim-sub (make-expr :lit-num (apply - vals))
           :prim-mul (make-expr :lit-num (apply * vals))
           :prim-div (when (not-any? zero? (rest vals))
-                     (make-expr :lit-num (apply / vals)))
+                      (make-expr :lit-num (apply / vals)))
           nil)))))
 
 (defn fold-comparison
@@ -342,9 +342,9 @@
 
       ;; Primitives - already constant
       (:prim-add :prim-sub :prim-mul :prim-div
-       :prim-eq :prim-lt :prim-gt
-       :prim-nth :prim-count :prim-conj
-       :prim-get :prim-assoc) expr
+                 :prim-eq :prim-lt :prim-gt
+                 :prim-nth :prim-count :prim-conj
+                 :prim-get :prim-assoc) expr
 
       ;; Function - fold body
       :fn-expr (let [[params body] (:args expr)]
@@ -369,7 +369,7 @@
                       folded-body (constant-fold body)]
                   ;; If val is a literal and name is not used, inline it
                   (if (and (literal? folded-val)
-                          (not (contains? (free-vars folded-body) name)))
+                           (not (contains? (free-vars folded-body) name)))
                     ;; Dead binding, just return body
                     folded-body
                     (make-expr :let-expr name folded-val folded-body)))
@@ -377,8 +377,8 @@
       ;; Letrec - fold body and in-expr
       :letrec-expr (let [[name params fn-body in-expr] (:args expr)]
                      (make-expr :letrec-expr name params
-                               (constant-fold fn-body)
-                               (constant-fold in-expr)))
+                                (constant-fold fn-body)
+                                (constant-fold in-expr)))
 
       ;; If - try to fold if test is constant
       :if-expr (let [[test then-expr else-expr] (:args expr)
@@ -391,8 +391,8 @@
       ;; Do - fold both expressions
       :do-expr (let [[expr1 expr2] (:args expr)]
                  (make-expr :do-expr
-                           (constant-fold expr1)
-                           (constant-fold expr2)))
+                            (constant-fold expr1)
+                            (constant-fold expr2)))
 
       ;; Data structures - fold elements
       :lit-vec (let [[elems] (:args expr)]
@@ -400,9 +400,9 @@
 
       :lit-map (let [[kvs] (:args expr)]
                  (make-expr :lit-map
-                           (mapv (fn [[k v]]
-                                   [(constant-fold k) (constant-fold v)])
-                                 kvs)))
+                            (mapv (fn [[k v]]
+                                    [(constant-fold k) (constant-fold v)])
+                                  kvs)))
 
       ;; Unknown - return as-is
       expr)))

@@ -18,21 +18,21 @@
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 ;; MorphismMonoid: Just one object with multiplication
 (theory/deftheory MorphismMonoid
   (type El)
   (term mul
-    :ctx [a El, b El]
-    :ret El)
+        :ctx [a El, b El]
+        :ret El)
   (term unit
-    :ret El))
+        :ret El))
 
 ;;; ============================================================================
 ;;; Identity Morphism Tests

@@ -4,8 +4,7 @@
             [katzen.stdlib.core :as stdlib]
             [katzen.stdlib.examples :as examples]
             [katzen.core :as core]
-            [katzen.presentation :as pres]
-))
+            [katzen.presentation :as pres]))
 
 ;;; ============================================================================
 ;;; Theory Definition Tests

@@ -31,79 +31,79 @@
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c)))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c)))
 
 (theory/deftheory TheoryTestTermWithCtx
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (theory/deftheory TheoryTestSimpleAxiom
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
   (axiom test
-    :ctx [a Ob, b Ob, c Ob,
-          f (Hom a b), g (Hom b c)]
-    (= (compose a b c f g)
-       (compose a b c f g))))
+         :ctx [a Ob, b Ob, c Ob,
+               f (Hom a b), g (Hom b c)]
+         (= (compose a b c f g)
+            (compose a b c f g))))
 
 (theory/deftheory TheoryTestCategory
   (type Ob)
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a))
+        :ctx [a Ob]
+        :ret (Hom a a))
 
   (axiom assoc
-    :ctx [a Ob, b Ob, c Ob, d Ob,
-          f (Hom a b), g (Hom b c), h (Hom c d)]
-    (= (compose a c d (compose a b c f g) h)
-       (compose a b d f (compose b c d g h))))
+         :ctx [a Ob, b Ob, c Ob, d Ob,
+               f (Hom a b), g (Hom b c), h (Hom c d)]
+         (= (compose a c d (compose a b c f g) h)
+            (compose a b d f (compose b c d g h))))
 
   (axiom id-left
-    :ctx [a Ob, b Ob, f (Hom a b)]
-    (= (compose a a b (id a) f) f))
+         :ctx [a Ob, b Ob, f (Hom a b)]
+         (= (compose a a b (id a) f) f))
 
   (axiom id-right
-    :ctx [a Ob, b Ob, f (Hom a b)]
-    (= (compose a b b f (id b)) f)))
+         :ctx [a Ob, b Ob, f (Hom a b)]
+         (= (compose a b b f (id b)) f)))
 
 (theory/deftheory TheoryTestMonoid
   (type M)
 
   (term mul
-    :args [x M, y M]
-    :ret M)
+        :args [x M, y M]
+        :ret M)
 
   (term e
-    :ret M)
+        :ret M)
 
   (axiom assoc
-    :ctx [x M, y M, z M]
-    (= (mul (mul x y) z)
-       (mul x (mul y z))))
+         :ctx [x M, y M, z M]
+         (= (mul (mul x y) z)
+            (mul x (mul y z))))
 
   (axiom id-left
-    :ctx [x M]
-    (= (mul (e) x) x))
+         :ctx [x M]
+         (= (mul (e) x) x))
 
   (axiom id-right
-    :ctx [x M]
-    (= (mul x (e)) x)))
+         :ctx [x M]
+         (= (mul x (e)) x)))
 
 (theory/deftheory TheoryTestMonoidalCategory
   ;; Base category structure
@@ -111,21 +111,21 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a))
+        :ctx [a Ob]
+        :ret (Hom a a))
 
   ;; Monoidal structure
   (term otimes
-    :args [a Ob, b Ob]
-    :ret Ob)
+        :args [a Ob, b Ob]
+        :ret Ob)
 
   (term munit
-    :ret Ob))
+        :ret Ob))
 
 (theory/deftheory TheoryTestPrintTest
   (type Ob)
@@ -136,9 +136,9 @@
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c)))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c)))
 
 ;;; ============================================================================
 ;;; Basic Theory Definition Tests

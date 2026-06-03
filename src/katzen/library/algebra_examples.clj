@@ -21,31 +21,31 @@
   {:s-type :nat}
 
   (S [_model args]
-    true)  ; All natural numbers are valid
+     true)  ; All natural numbers are valid
 
   (mul [_model args]
-    (let [[x y] args]
-      (+ x y))))
+       (let [[x y] args]
+         (+ x y))))
 
 (model/definstance NatMulSemigroup alg/ThSemigroup
   {:s-type :nat}
 
   (S [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (* x y))))
+       (let [[x y] args]
+         (* x y))))
 
 (model/definstance StringSemigroup alg/ThSemigroup
   {:s-type :string}
 
   (S [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (str x y))))
+       (let [[x y] args]
+         (str x y))))
 
 (model/defsymbolic SymSemigroup alg/ThSemigroup
   {:normalize? false})
@@ -58,53 +58,53 @@
   {:m-type :nat}
 
   (M [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (+ x y)))
+       (let [[x y] args]
+         (+ x y)))
 
   (unit [_model args]
-    0))
+        0))
 
 (model/definstance NatMulMonoid alg/ThCommutativeMonoid
   {:m-type :nat}
 
   (M [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (* x y)))
+       (let [[x y] args]
+         (* x y)))
 
   (unit [_model args]
-    1))
+        1))
 
 (model/definstance BoolAndMonoid alg/ThCommutativeMonoid
   {:m-type :boolean}
 
   (M [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (and x y)))
+       (let [[x y] args]
+         (and x y)))
 
   (unit [_model args]
-    true))
+        true))
 
 (model/definstance BoolOrMonoid alg/ThCommutativeMonoid
   {:m-type :boolean}
 
   (M [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (or x y)))
+       (let [[x y] args]
+         (or x y)))
 
   (unit [_model args]
-    false))
+        false))
 
 (model/defsymbolic SymCommutativeMonoid alg/ThCommutativeMonoid
   {:normalize? false})
@@ -117,36 +117,36 @@
   {:g-type :integer}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (+ x y)))
+       (let [[x y] args]
+         (+ x y)))
 
   (unit [_model args]
-    0)
+        0)
 
   (inv [_model args]
-    (let [[x] args]
-      (- x))))
+       (let [[x] args]
+         (- x))))
 
 (model/definstance IntMulUnitsGroup alg/ThGroup
   {:g-type #{-1 1}
    :doc "Multiplicative group of units in integers: {-1, 1}"}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (* x y)))
+       (let [[x y] args]
+         (* x y)))
 
   (unit [_model args]
-    1)
+        1)
 
   (inv [_model args]
-    (let [[x] args]
-      x)))  ; 1^-1 = 1, (-1)^-1 = -1
+       (let [[x] args]
+         x)))  ; 1^-1 = 1, (-1)^-1 = -1
 
 ;; Integers modulo n under addition form a group.
 ;; Example: n=5 gives group {0, 1, 2, 3, 4} under addition mod 5.
@@ -155,20 +155,20 @@
    :modulus 5}  ; Can be parameterized
 
   (G [model args]
-    true)
+     true)
 
   (mul [model args]
-    (let [[x y] args
-          n (get (:type-map model) :modulus 5)]
-      (mod (+ x y) n)))
+       (let [[x y] args
+             n (get (:type-map model) :modulus 5)]
+         (mod (+ x y) n)))
 
   (unit [_model args]
-    0)
+        0)
 
   (inv [model args]
-    (let [[x] args
-          n (get (:type-map model) :modulus 5)]
-      (mod (- n x) n))))
+       (let [[x] args
+             n (get (:type-map model) :modulus 5)]
+         (mod (- n x) n))))
 
 (model/defsymbolic SymGroup alg/ThGroup
   {:normalize? false})
@@ -181,35 +181,35 @@
   {:g-type :integer}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (+ x y)))
+       (let [[x y] args]
+         (+ x y)))
 
   (unit [_model args]
-    0)
+        0)
 
   (inv [_model args]
-    (let [[x] args]
-      (- x))))
+       (let [[x] args]
+         (- x))))
 
 (model/definstance RatAddAbelianGroup alg/ThAbelianGroup
   {:g-type :ratio}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[x y] args]
-      (+ x y)))
+       (let [[x y] args]
+         (+ x y)))
 
   (unit [_model args]
-    0)
+        0)
 
   (inv [_model args]
-    (let [[x] args]
-      (- x))))
+       (let [[x] args]
+         (- x))))
 
 ;; Vectors in R^n under addition form an abelian group.
 ;; This demonstrates that the theory can model infinite-dimensional structures.
@@ -217,18 +217,18 @@
   {:g-type :vector}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [_model args]
-    (let [[v w] args]
-      (mapv + v w)))
+       (let [[v w] args]
+         (mapv + v w)))
 
   (unit [_model args]
-    [])  ; Empty vector as zero
+        [])  ; Empty vector as zero
 
   (inv [_model args]
-    (let [[v] args]
-      (mapv - v))))
+       (let [[v] args]
+         (mapv - v))))
 
 ;; Integers modulo n under addition form an abelian group.
 (model/definstance ModuloAddAbelianGroup alg/ThAbelianGroup
@@ -236,20 +236,20 @@
    :modulus 7}
 
   (G [_model args]
-    true)
+     true)
 
   (mul [model args]
-    (let [[x y] args
-          n (get (:type-map model) :modulus 7)]
-      (mod (+ x y) n)))
+       (let [[x y] args
+             n (get (:type-map model) :modulus 7)]
+         (mod (+ x y) n)))
 
   (unit [_model args]
-    0)
+        0)
 
   (inv [model args]
-    (let [[x] args
-          n (get (:type-map model) :modulus 7)]
-      (mod (- n x) n))))
+       (let [[x] args
+             n (get (:type-map model) :modulus 7)]
+         (mod (- n x) n))))
 
 (model/defsymbolic SymAbelianGroup alg/ThAbelianGroup
   {:normalize? false})

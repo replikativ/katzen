@@ -109,9 +109,9 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           if-expr (make-expr :if-expr
-                            (make-expr :lit-bool true)
-                            (make-expr :lit-num 1)
-                            (make-expr :lit-num 2))
+                             (make-expr :lit-bool true)
+                             (make-expr :lit-num 1)
+                             (make-expr :lit-num 2))
           result (clj-eval/eval-expr model if-expr env)]
       (is (= 1 result)))))
 
@@ -120,9 +120,9 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           if-expr (make-expr :if-expr
-                            (make-expr :lit-bool false)
-                            (make-expr :lit-num 1)
-                            (make-expr :lit-num 2))
+                             (make-expr :lit-bool false)
+                             (make-expr :lit-num 1)
+                             (make-expr :lit-num 2))
           result (clj-eval/eval-expr model if-expr env)]
       (is (= 2 result)))))
 
@@ -131,9 +131,9 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           if-expr (make-expr :if-expr
-                            (make-expr :lit-nil)
-                            (make-expr :lit-num 1)
-                            (make-expr :lit-num 2))
+                             (make-expr :lit-nil)
+                             (make-expr :lit-num 1)
+                             (make-expr :lit-num 2))
           result (clj-eval/eval-expr model if-expr env)]
       (is (= 2 result)))))
 
@@ -142,8 +142,8 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           do-expr (make-expr :do-expr
-                            (make-expr :lit-num 1)
-                            (make-expr :lit-num 2))
+                             (make-expr :lit-num 1)
+                             (make-expr :lit-num 2))
           result (clj-eval/eval-expr model do-expr env)]
       (is (= 2 result)))))
 
@@ -207,9 +207,9 @@
                                'y
                                (make-expr :lit-num 10)
                                (make-expr :if-expr
-                                         (make-expr :lit-bool true)
-                                         (make-expr :var 'x)
-                                         (make-expr :var 'y)))
+                                          (make-expr :lit-bool true)
+                                          (make-expr :var 'x)
+                                          (make-expr :var 'y)))
           outer-let (make-expr :let-expr
                                'x
                                (make-expr :lit-num 5)
@@ -253,16 +253,16 @@
           env {}
           ;; (fn [x y] (+ x y))
           add-fn (make-expr :fn-expr
-                           ['x 'y]
-                           (make-expr :app
-                                     (make-expr :prim-add)
-                                     [(make-expr :var 'x)
-                                      (make-expr :var 'y)]))
+                            ['x 'y]
+                            (make-expr :app
+                                       (make-expr :prim-add)
+                                       [(make-expr :var 'x)
+                                        (make-expr :var 'y)]))
           ;; ((fn [x y] (+ x y)) 2 3)
           app-expr (make-expr :app
-                             add-fn
-                             [(make-expr :lit-num 2)
-                              (make-expr :lit-num 3)])
+                              add-fn
+                              [(make-expr :lit-num 2)
+                               (make-expr :lit-num 3)])
           result (clj-eval/eval-expr model app-expr env)]
       (is (= 5 result)))))
 
@@ -272,20 +272,20 @@
           env {}
           ;; (fn [x y z] (+ (+ x y) z))
           add3-fn (make-expr :fn-expr
-                            ['x 'y 'z]
-                            (make-expr :app
-                                      (make-expr :prim-add)
-                                      [(make-expr :app
-                                                 (make-expr :prim-add)
-                                                 [(make-expr :var 'x)
-                                                  (make-expr :var 'y)])
-                                       (make-expr :var 'z)]))
+                             ['x 'y 'z]
+                             (make-expr :app
+                                        (make-expr :prim-add)
+                                        [(make-expr :app
+                                                    (make-expr :prim-add)
+                                                    [(make-expr :var 'x)
+                                                     (make-expr :var 'y)])
+                                         (make-expr :var 'z)]))
           ;; ((fn [x y z] ...) 1 2 3)
           app-expr (make-expr :app
-                             add3-fn
-                             [(make-expr :lit-num 1)
-                              (make-expr :lit-num 2)
-                              (make-expr :lit-num 3)])
+                              add3-fn
+                              [(make-expr :lit-num 1)
+                               (make-expr :lit-num 2)
+                               (make-expr :lit-num 3)])
           result (clj-eval/eval-expr model app-expr env)]
       (is (= 6 result)))))
 
@@ -295,15 +295,15 @@
           env {}
           ;; (fn [x y] (+ x y))
           binary-fn (make-expr :fn-expr
-                              ['x 'y]
-                              (make-expr :app
-                                        (make-expr :prim-add)
-                                        [(make-expr :var 'x)
-                                         (make-expr :var 'y)]))
+                               ['x 'y]
+                               (make-expr :app
+                                          (make-expr :prim-add)
+                                          [(make-expr :var 'x)
+                                           (make-expr :var 'y)]))
           ;; Try to call with 1 argument (should fail)
           app-expr (make-expr :app
-                             binary-fn
-                             [(make-expr :lit-num 42)])]
+                              binary-fn
+                              [(make-expr :lit-num 42)])]
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"Arity mismatch"
@@ -320,31 +320,31 @@
           ;; (letrec [fact (fn [n] (if (= n 0) 1 (* n (fact (- n 1)))))]
           ;;   (fact 5))
           letrec-expr (make-expr :letrec-expr
-                                'fact
-                                ['n]
+                                 'fact
+                                 ['n]
                                 ;; if (= n 0) 1 (* n (fact (- n 1)))
-                                (make-expr :if-expr
+                                 (make-expr :if-expr
                                           ;; test: (= n 0)
-                                          (make-expr :app
-                                                    (make-expr :prim-eq)
-                                                    [(make-expr :var 'n)
-                                                     (make-expr :lit-num 0)])
+                                            (make-expr :app
+                                                       (make-expr :prim-eq)
+                                                       [(make-expr :var 'n)
+                                                        (make-expr :lit-num 0)])
                                           ;; then: 1
-                                          (make-expr :lit-num 1)
+                                            (make-expr :lit-num 1)
                                           ;; else: (* n (fact (- n 1)))
-                                          (make-expr :app
-                                                    (make-expr :prim-mul)
-                                                    [(make-expr :var 'n)
-                                                     (make-expr :app
-                                                               (make-expr :var 'fact)
-                                                               [(make-expr :app
-                                                                          (make-expr :prim-sub)
-                                                                          [(make-expr :var 'n)
-                                                                           (make-expr :lit-num 1)])])]))
+                                            (make-expr :app
+                                                       (make-expr :prim-mul)
+                                                       [(make-expr :var 'n)
+                                                        (make-expr :app
+                                                                   (make-expr :var 'fact)
+                                                                   [(make-expr :app
+                                                                               (make-expr :prim-sub)
+                                                                               [(make-expr :var 'n)
+                                                                                (make-expr :lit-num 1)])])]))
                                 ;; in-expr: (fact 5)
-                                (make-expr :app
-                                          (make-expr :var 'fact)
-                                          [(make-expr :lit-num 5)]))
+                                 (make-expr :app
+                                            (make-expr :var 'fact)
+                                            [(make-expr :lit-num 5)]))
           result (clj-eval/eval-expr model letrec-expr env)]
       (is (= 120 result)))))
 
@@ -355,36 +355,36 @@
           ;; (letrec [fib (fn [n] (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))))]
           ;;   (fib 6))
           letrec-expr (make-expr :letrec-expr
-                                'fib
-                                ['n]
+                                 'fib
+                                 ['n]
                                 ;; if (< n 2) n (+ (fib (- n 1)) (fib (- n 2)))
-                                (make-expr :if-expr
+                                 (make-expr :if-expr
                                           ;; test: (< n 2)
-                                          (make-expr :app
-                                                    (make-expr :prim-lt)
-                                                    [(make-expr :var 'n)
-                                                     (make-expr :lit-num 2)])
+                                            (make-expr :app
+                                                       (make-expr :prim-lt)
+                                                       [(make-expr :var 'n)
+                                                        (make-expr :lit-num 2)])
                                           ;; then: n
-                                          (make-expr :var 'n)
+                                            (make-expr :var 'n)
                                           ;; else: (+ (fib (- n 1)) (fib (- n 2)))
-                                          (make-expr :app
-                                                    (make-expr :prim-add)
-                                                    [(make-expr :app
-                                                               (make-expr :var 'fib)
-                                                               [(make-expr :app
-                                                                          (make-expr :prim-sub)
-                                                                          [(make-expr :var 'n)
-                                                                           (make-expr :lit-num 1)])])
-                                                     (make-expr :app
-                                                               (make-expr :var 'fib)
-                                                               [(make-expr :app
-                                                                          (make-expr :prim-sub)
-                                                                          [(make-expr :var 'n)
-                                                                           (make-expr :lit-num 2)])])]))
+                                            (make-expr :app
+                                                       (make-expr :prim-add)
+                                                       [(make-expr :app
+                                                                   (make-expr :var 'fib)
+                                                                   [(make-expr :app
+                                                                               (make-expr :prim-sub)
+                                                                               [(make-expr :var 'n)
+                                                                                (make-expr :lit-num 1)])])
+                                                        (make-expr :app
+                                                                   (make-expr :var 'fib)
+                                                                   [(make-expr :app
+                                                                               (make-expr :prim-sub)
+                                                                               [(make-expr :var 'n)
+                                                                                (make-expr :lit-num 2)])])]))
                                 ;; in-expr: (fib 6)
-                                (make-expr :app
-                                          (make-expr :var 'fib)
-                                          [(make-expr :lit-num 6)]))
+                                 (make-expr :app
+                                            (make-expr :var 'fib)
+                                            [(make-expr :lit-num 6)]))
           result (clj-eval/eval-expr model letrec-expr env)]
       (is (= 8 result)))))
 
@@ -397,9 +397,9 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           vec-expr (make-expr :lit-vec
-                             [(make-expr :lit-num 1)
-                              (make-expr :lit-num 2)
-                              (make-expr :lit-num 3)])
+                              [(make-expr :lit-num 1)
+                               (make-expr :lit-num 2)
+                               (make-expr :lit-num 3)])
           result (clj-eval/eval-expr model vec-expr env)]
       (is (= [1 2 3] result)))))
 
@@ -408,14 +408,14 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           vec-expr (make-expr :lit-vec
-                             [(make-expr :lit-num 1)
-                              (make-expr :lit-num 2)
-                              (make-expr :lit-num 3)])
+                              [(make-expr :lit-num 1)
+                               (make-expr :lit-num 2)
+                               (make-expr :lit-num 3)])
           ;; (nth vec 1)
           nth-expr (make-expr :app
-                             (make-expr :prim-nth)
-                             [vec-expr
-                              (make-expr :lit-num 1)])
+                              (make-expr :prim-nth)
+                              [vec-expr
+                               (make-expr :lit-num 1)])
           result (clj-eval/eval-expr model nth-expr env)]
       (is (= 2 result)))))
 
@@ -424,13 +424,13 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           vec-expr (make-expr :lit-vec
-                             [(make-expr :lit-num 1)
-                              (make-expr :lit-num 2)
-                              (make-expr :lit-num 3)])
+                              [(make-expr :lit-num 1)
+                               (make-expr :lit-num 2)
+                               (make-expr :lit-num 3)])
           ;; (count vec)
           count-expr (make-expr :app
-                               (make-expr :prim-count)
-                               [vec-expr])
+                                (make-expr :prim-count)
+                                [vec-expr])
           result (clj-eval/eval-expr model count-expr env)]
       (is (= 3 result)))))
 
@@ -439,13 +439,13 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           vec-expr (make-expr :lit-vec
-                             [(make-expr :lit-num 1)
-                              (make-expr :lit-num 2)])
+                              [(make-expr :lit-num 1)
+                               (make-expr :lit-num 2)])
           ;; (conj vec 3)
           conj-expr (make-expr :app
-                              (make-expr :prim-conj)
-                              [vec-expr
-                               (make-expr :lit-num 3)])
+                               (make-expr :prim-conj)
+                               [vec-expr
+                                (make-expr :lit-num 3)])
           result (clj-eval/eval-expr model conj-expr env)]
       (is (= [1 2 3] result)))))
 
@@ -454,10 +454,10 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           map-expr (make-expr :lit-map
-                             [[(make-expr :lit-str "x")
-                               (make-expr :lit-num 10)]
-                              [(make-expr :lit-str "y")
-                               (make-expr :lit-num 20)]])
+                              [[(make-expr :lit-str "x")
+                                (make-expr :lit-num 10)]
+                               [(make-expr :lit-str "y")
+                                (make-expr :lit-num 20)]])
           result (clj-eval/eval-expr model map-expr env)]
       (is (= {"x" 10 "y" 20} result)))))
 
@@ -466,15 +466,15 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           map-expr (make-expr :lit-map
-                             [[(make-expr :lit-str "x")
-                               (make-expr :lit-num 10)]
-                              [(make-expr :lit-str "y")
-                               (make-expr :lit-num 20)]])
+                              [[(make-expr :lit-str "x")
+                                (make-expr :lit-num 10)]
+                               [(make-expr :lit-str "y")
+                                (make-expr :lit-num 20)]])
           ;; (get map "x")
           get-expr (make-expr :app
-                             (make-expr :prim-get)
-                             [map-expr
-                              (make-expr :lit-str "x")])
+                              (make-expr :prim-get)
+                              [map-expr
+                               (make-expr :lit-str "x")])
           result (clj-eval/eval-expr model get-expr env)]
       (is (= 10 result)))))
 
@@ -483,13 +483,13 @@
     (let [model (clj-eval/->StandardEval)
           env {}
           map-expr (make-expr :lit-map
-                             [[(make-expr :lit-str "x")
-                               (make-expr :lit-num 10)]])
+                              [[(make-expr :lit-str "x")
+                                (make-expr :lit-num 10)]])
           ;; (assoc map "z" 30)
           assoc-expr (make-expr :app
-                               (make-expr :prim-assoc)
-                               [map-expr
-                                (make-expr :lit-str "z")
-                                (make-expr :lit-num 30)])
+                                (make-expr :prim-assoc)
+                                [map-expr
+                                 (make-expr :lit-str "z")
+                                 (make-expr :lit-num 30)])
           result (clj-eval/eval-expr model assoc-expr env)]
       (is (= {"x" 10 "z" 30} result)))))

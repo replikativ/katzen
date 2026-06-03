@@ -83,7 +83,7 @@
   [g op p]
   (let [[g c] (a/add-part g :Conn)]
     [(-> g (a/set-subpart :outer-port c op)
-           (a/set-subpart :inner-port c p)) c]))
+         (a/set-subpart :inner-port c p)) c]))
 
 ;; ============================================================================
 ;; Accessors

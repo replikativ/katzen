@@ -20,12 +20,12 @@
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 ;;; ============================================================================
 ;;; Presentation Creation Tests
@@ -281,8 +281,8 @@
           lhs (core/alg-term (scope/ident tag 1 'x) [] v-type)
           rhs (core/alg-term (scope/ident tag 2 'y) [] v-type)
           extended (pres/extend-presentation base
-                                              [['v2 'V] ['e1 'E]]
-                                              [[lhs rhs]])]
+                                             [['v2 'V] ['e1 'E]]
+                                             [[lhs rhs]])]
       (is (= 3 (count (:generators extended))))
       (is (pres/has-generator? extended 'v1))
       (is (pres/has-generator? extended 'v2))

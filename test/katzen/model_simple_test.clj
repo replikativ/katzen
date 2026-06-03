@@ -10,11 +10,11 @@
 (model/definstance TestModel TestTh {}
   (Ob [_m args]
     ;; Ob is nullary, args should be empty
-    true)
+      true)
 
   (check [_m args]
-    (let [[x] args]
-      (pos? x))))
+         (let [[x] args]
+           (pos? x))))
 
 (deftest test-simple-model
   (testing "Simple model works"

@@ -31,7 +31,7 @@
 ;; ============================================================================
 
 (defrecord ContinuousResourceSharer
-  [layout port-states raster-body-fn clojure-body-fn]
+           [layout port-states raster-body-fn clojure-body-fn]
   cc/RasterCompilable
   (-state-layout [_] layout)
   (-raster-body  [_ override-layout] (raster-body-fn override-layout))
@@ -154,7 +154,7 @@
         clojure-body-fn
         (fn [_override]
           (let [bodies (mapv (fn [b] (cc/clojure-body (get box->crs b)
-                                                     (layout-for-box b)))
+                                                      (layout-for-box b)))
                              boxes)]
             (fn accumulate [^doubles du ^doubles u t]
               (doseq [^clojure.lang.IFn body bodies]

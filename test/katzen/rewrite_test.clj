@@ -215,24 +215,24 @@
   (type Hom [dom Ob, codom Ob])
 
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
 
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a))
+        :ctx [a Ob]
+        :ret (Hom a a))
 
   ;; Identity law: id(a) ∘ f = f
   (axiom id-left
-    :ctx [a Ob, b Ob, f (Hom a b)]
-    (= (compose a a b (id a) f) f)))
+         :ctx [a Ob, b Ob, f (Hom a b)]
+         (= (compose a a b (id a) f) f)))
 
 (deftest test-theory-integration
   (testing "Can convert terms from real theory"
     (let [;; Get a term constructor from the theory
           compose-term (first (filter #(= 'compose (-> % :term :head :name))
-                                       (:term-constructors RewriteSimpleCategory)))
+                                      (:term-constructors RewriteSimpleCategory)))
           ;; This is a term in context, extract the actual term
           term-in-ctx (:term compose-term)
           sexp (rewrite/term->sexp term-in-ctx)]
@@ -276,8 +276,8 @@
 
           ;; Apply the rule
           result (rewrite/apply-rule
-                   (rewrite/axiom->rule axiom free-vars)
-                   lhs-term)]
+                  (rewrite/axiom->rule axiom free-vars)
+                  lhs-term)]
 
       ;; Result should be the simplified term (RHS of axiom)
       ;; For id-left axiom: (compose a a b (id a) f) => f

@@ -17,23 +17,23 @@
   (type Ob)
   (type Hom [dom Ob, codom Ob])
   (term compose
-    :ctx [a Ob, b Ob, c Ob]
-    :args [f (Hom a b), g (Hom b c)]
-    :ret (Hom a c))
+        :ctx [a Ob, b Ob, c Ob]
+        :args [f (Hom a b), g (Hom b c)]
+        :ret (Hom a c))
   (term id
-    :ctx [a Ob]
-    :ret (Hom a a)))
+        :ctx [a Ob]
+        :ret (Hom a a)))
 
 (theory/deftheory Preorder
   (type default)
   (type Leq [dom default, codom default])
   (term trans
-    :ctx [a default, b default, c default]
-    :args [f (Leq a b), g (Leq b c)]
-    :ret (Leq a c))
+        :ctx [a default, b default, c default]
+        :args [f (Leq a b), g (Leq b c)]
+        :ret (Leq a c))
   (term refl
-    :ctx [a default]
-    :ret (Leq a a)))
+        :ctx [a default]
+        :ret (Leq a a)))
 
 ;;; ============================================================================
 ;;; Morphism Validation Tests
