@@ -23,8 +23,21 @@
    doesn't have that value assigned yet), the axiom is treated as
    vacuously satisfied at that binding. This matches the existing
    partial-morphism semantics in `katzen.acset.migration` and avoids
-   spurious failures from in-progress data."
-  (:require [katzen.acset :as a]))
+   spurious failures from in-progress data.
+
+   PATH EQUATIONS. The general `:axioms` form above is expressive but verbose
+   for the common case — two morphism PATHS out of one object that must agree
+   (the ACSets.jl `eqs` idiom, `Eq = (name, dom, codom, (path1, path2))`).
+   Such equations may instead be declared in a schema's `:equations` field as
+
+     {:name <opt> :dom <Ob> :lhs [m1 m2 …] :rhs [n1 …] :codom <opt>}
+
+   where `:lhs`/`:rhs` are sequences of hom/attr names applied LEFT-TO-RIGHT
+   (an empty path is the identity). `path-equation->axiom` compiles each into
+   the general axiom shape, and `check-axioms`/`check-axioms!` check `:equations`
+   and `:axioms` together — so path equations reuse exactly this checker."
+  (:require [clojure.string :as str]
+            [katzen.acset :as a]))
 
 ;; ============================================================================
 ;; Term evaluation
@@ -75,6 +88,42 @@
    ctx))
 
 ;; ============================================================================
+;; Path equations (the ACSets.jl `eqs` idiom) → general axioms
+;; ============================================================================
+
+(defn- path->term
+  "Compile a path (seq of hom/attr names, applied LEFT-TO-RIGHT) into an axiom
+   term over the variable `var-sym`. The empty path is the identity (the
+   variable itself); `[:f :g]` becomes `(g (f x))`."
+  [var-sym path]
+  (reduce (fn [acc m] (list (symbol (name m)) acc)) var-sym path))
+
+(defn path-equation->axiom
+  "Compile an ACSets.jl-style path equation
+
+     {:name <opt> :dom <Ob> :lhs [m …] :rhs [n …] :codom <opt>}
+
+   (two morphism paths out of object `:dom` that must agree on every part)
+   into the general axiom shape consumed by `check-axiom`. `:lhs`/`:rhs` are
+   sequences of hom/attr names applied left-to-right; an empty path is the
+   identity. For richer (non-path) term equations, write an `:axioms` entry
+   directly instead."
+  [{:keys [name dom lhs rhs]}]
+  (assert dom ":dom is required for a path equation")
+  {:name (or name (symbol (str (str/join "," (map clojure.core/name lhs))
+                               "=" (str/join "," (map clojure.core/name rhs)))))
+   :ctx  [{:name 'x :type dom}]
+   :lhs  (path->term 'x lhs)
+   :rhs  (path->term 'x rhs)})
+
+(defn schema-axioms
+  "Every checkable axiom of `schema`: its explicit `:axioms`, plus the path
+   equations in `:equations` compiled via `path-equation->axiom`."
+  [schema]
+  (concat (:axioms schema)
+          (map path-equation->axiom (:equations schema))))
+
+;; ============================================================================
 ;; Public API
 ;; ============================================================================
 
@@ -98,10 +147,11 @@
    (all-bindings acset ctx)))
 
 (defn check-axioms
-  "Walk every axiom on `(a/schema acset)`. Returns nil if all pass, or
+  "Walk every axiom on `(a/schema acset)` — both the explicit `:axioms` and the
+   path equations in `:equations` (see `schema-axioms`). Returns nil if all pass, or
    the first violation."
   [acset]
-  (some #(check-axiom acset %) (:axioms (a/schema acset))))
+  (some #(check-axiom acset %) (schema-axioms (a/schema acset))))
 
 (defn check-axioms!
   "Strict variant: returns `acset` on success, throws on the first

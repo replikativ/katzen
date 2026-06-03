@@ -27,10 +27,20 @@
 ;;    :objects   [Symbol ...]            ;; ordered (preserves declaration order)
 ;;    :homs      [{:name Sym :dom Sym :codom Sym} ...]
 ;;    :attr-types [Symbol ...]
-;;    :attrs     [{:name Sym :dom Sym :codom Sym} ...]}
+;;    :attrs     [{:name Sym :dom Sym :codom Sym} ...]
+;;    :equations [{:name Sym? :dom Sym :lhs [Sym ...] :rhs [Sym ...] :codom Sym?} ...]
+;;    :axioms    [{:name Sym :ctx [{:name Sym :type Sym} ...] :lhs term :rhs term} ...]}
 ;;
 ;; The :dom and :codom for :homs are object names; for :attrs, :codom is
 ;; an attr-type name.
+;;
+;; :equations are PATH equations (the ACSets.jl `eqs` idiom): two morphism
+;; paths out of object :dom — sequences of hom/attr names applied
+;; left-to-right — that must agree on every part. :axioms are the general
+;; (non-path) term-equation form. Both are enforced by katzen.acset.check
+;; (`check-axioms!`) and consumed by the normalizer; `:equations` desugar into
+;; `:axioms` (see katzen.acset.check/path-equation->axiom). The datahike
+;; backend ignores both (they are instance constraints, not storage schema).
 ;;
 ;; katzen.acset.schemas converts a katzen Schema presentation (a
 ;; presentation of ThSchema) into this map. Hand-written schemas are
