@@ -29,6 +29,41 @@ category lab, and an honest sibling to Catlab.jl.
 [Catlab/GATlab comparison notebook](dev/notebooks/comparison_with_catlab.clj)
 (a runnable side-by-side with the Julia stack).
 
+## What can I do with it?
+
+Concretely, today:
+
+- **Keep structured data in datahike and stop hand-writing validation.** Declare
+  a schema — objects, foreign keys, typed columns — and its *invariants* as path
+  equations ("debits equal credits", "no link dangles", "a task's next-state is
+  reachable"). The kernel checks them (`check-axioms!`); your rules live in the
+  schema, not scattered across `assert`s.
+- **Migrate a schema without writing a migration script.** A schema morphism
+  gives Δ-migration in one line — data moves structure-preservingly instead of
+  being silently dropped by an ad-hoc rewrite.
+- **Relate data of different shapes.** Find ACSet homomorphisms ("does this
+  pattern occur in my graph?"), or cross-reference two stores by a shared
+  identity (a URI) — join a ledger to a CRM to a wiki with no bespoke join code.
+- **Aggregate with one fold.** Balances, counts, sums are a commutative-monoid
+  rollup defined once — the same construction for every report.
+- **Model and simulate processes.** Build a Petri net or reaction network (an
+  SIR epidemic, enzyme kinetics, a queue, a population model) with mass-action /
+  Hill / Michaelis–Menten rates; compose subsystems with wiring diagrams
+  (`oapply`); compile to typed numerics and solve the ODEs fast (`:raster`).
+- **Define a little language, get many interpreters.** A GAT is a DSL; one term
+  runs through many algebras — evaluate, pretty-print, cost, compile, draw. (The
+  repo even models *a category of Clojure programs*.)
+- **Prove a translation is correct.** The `:ansatz` alias checks a schema/theory
+  morphism with a Lean kernel — structure-preservation as a proof, not a test.
+
+**When to reach for it:** you have data or processes with real *structure* —
+relations, invariants, several representations that must stay in sync — and you
+want it declared once and then *checked, migrated, related, and simulated* as
+data. (If you just want `Functor`/`Monad` protocols for FP plumbing, that's
+`cats`'s axis — see "What this gives you that `cats` doesn't" below.) A longer
+treatment, with knowledge / code / accounting worked side-by-side, is in
+[doc/schemata.md](doc/schemata.md).
+
 ## Define a category
 
 A *generalized algebraic theory* (GAT) is the data shape Katzen uses
