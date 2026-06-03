@@ -1,0 +1,56 @@
+name: playground-pages
+
+# Build the ClojureScript string-diagram playground (shadow-cljs release) and
+# publish it to GitHub Pages. Enable in repo Settings → Pages → Source:
+# "GitHub Actions".  The playground is self-hosted (we don't publish to npm),
+# so the optimized JS is bundled into the deployed site.
+
+on:
+  push:
+    branches: [main, feat/string-diagrams]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          cli: 'latest'
+      - name: Install npm deps
+        run: npm ci
+      - name: Release build (advanced)
+        run: npx shadow-cljs release playground
+      - name: Assemble site
+        run: |
+          mkdir -p public/dist/playground
+          cp dist/playground/playground.js public/dist/playground/
+          # Pages serves under /<repo>/, so use a relative script path.
+          sed 's#/dist/playground/playground.js#./dist/playground/playground.js#' \
+            examples/playground.html > public/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -91,12 +91,21 @@
       [:> Handle {:type "source" :position (.-Right Position) :id "out"
                   :style (out-handle-style pure?)}]])))
 
+(defn- render-group [^js props]
+  ;; a sub-flow container (if-branch / fn body) with its label in the corner
+  (r/as-element
+   [:div {:style {:width "100%" :height "100%" :pointerEvents "none"}}
+    [:span {:style {:position "absolute" :top 3 :left 8 :fontSize 10 :fontWeight 700
+                    :letterSpacing "0.04em" :textTransform "uppercase" :color "#a78bfa"}}
+     (aget (.-data props) "label")]]))
+
 (def ^:private node-types
   ;; module-level const (ReactFlow re-renders if nodeTypes identity changes)
   (let [mk (fn [t] (fn [props] (render-node t props)))]
     #js {"box" (mk "box") "cond" (mk "cond") "program" (mk "program")
          "run" (mk "run") "recur" (mk "recur") "recursive" (mk "recursive")
-         "input" (mk "input") "result" (mk "result")}))
+         "input" (mk "input") "result" (mk "result")
+         "group" (fn [props] (render-group props))}))
 
 ;; ---------------------------------------------------------------------------
 ;; ReactFlow node/edge data (positions from ELK)
@@ -124,28 +133,65 @@
 ;; State + recompute
 ;; ---------------------------------------------------------------------------
 
-(def default-code
-  "(defn fact [n acc]\n  (if (pos? n)\n    (recur (dec n) (* n acc))\n    acc))")
+;; A control system as a DIAGRAM VALUE (the same shape `fn->diagram` produces).
+;; Shows the renderer is category-agnostic: directed machines (sensor → controller
+;; → plant, with feedback) land in the SAME diagrammatic substrate as code.
+;; (Computed by hand here; running `oapply` live in the browser is future work.)
+(def control-example
+  {:name "uav-control"
+   :inputs [{:port "e" :label "e"} {:port "d" :label "d"}]
+   :boxes [{:id "in_e" :label "e (setpoint)" :input? true :ins [] :out "e" :group []}
+           {:id "in_d" :label "d (setpoint)" :input? true :ins [] :out "d" :group []}
+           {:id "sensor"     :label "sensor"     :ins ["theta" "e"] :out "sp" :group []}
+           {:id "controller" :label "controller" :ins ["sp" "d"]    :out "c"  :group []}
+           {:id "plant"      :label "plant"      :ins ["c"]         :out "theta" :group []}]
+   :wires [{:from "theta" :to "sp" :trace? true}   ; plant output fed BACK to the sensor
+           {:from "e" :to "sp"}
+           {:from "sp" :to "c"} {:from "d" :to "c"}
+           {:from "c" :to "theta"}]
+   :outputs ["theta"]})
+
+(def examples
+  [{:label "factorial — recursion (trace)"
+    :code "(defn fact [n acc]\n  (if (pos? n)\n    (recur (dec n) (* n acc))\n    acc))"}
+   {:label "stats — let, copy, dead binding"
+    :code "(defn stats [xs]\n  (let [n      (count xs)\n        total  (reduce + 0 xs)\n        mean   (/ total n)\n        unused (first xs)]\n    (vector mean n)))"}
+   {:label "scale-all — higher-order (map + fn)"
+    :code "(defn scale-all [xs k]\n  (map (fn [x] (* x k)) xs))"}
+   {:label "classify — nested conditionals"
+    :code "(defn classify [x]\n  (if (pos? x) :pos\n    (if (neg? x) :neg :zero)))"}
+   {:label "UAV control loop — directed machines (dynamics)"
+    :diagram control-example
+    :code ";; A CONTROL SYSTEM, not Clojure code — the SAME diagram substrate.\n;; sensor → controller → plant, with the plant output fed back to the\n;; sensor (the ↺ trace). Outer inputs: setpoints e, d.  (See doc/composition.md.)"}])
+
+(def default-code (:code (first examples)))
 
 (defonce state (r/atom {:code default-code :nodes #js [] :edges #js [] :err nil}))
 
 (defn- def-form? [form]
   (and (seq? form) (contains? '#{defn defn- fn fn*} (first form))))
 
+(defn render-diagram! [dia]
+  (let [rf (diagram/->reactflow dia)]
+    (-> (.layout elk (->elk (:nodes rf) (:edges rf)))
+        (.then (fn [res]
+                 (swap! state assoc
+                        :nodes (->rf-nodes (:nodes rf) (reduce collect-pos {} (.-children res)))
+                        :edges (->rf-edges (:edges rf))
+                        :err nil)))
+        (.catch (fn [e] (swap! state assoc :err (str "layout: " e)))))))
+
 (defn recompute! [code]
   (try
     (let [form (reader/read-string code)]
       (if-not (def-form? form)
         (swap! state assoc :err "Paste a (defn …) or (fn …) form.")
-        (let [rf (diagram/->reactflow (prog/fn->diagram form))]
-          (-> (.layout elk (->elk (:nodes rf) (:edges rf)))
-              (.then (fn [res]
-                       (swap! state assoc
-                              :nodes (->rf-nodes (:nodes rf) (reduce collect-pos {} (.-children res)))
-                              :edges (->rf-edges (:edges rf))
-                              :err nil)))
-              (.catch (fn [e] (swap! state assoc :err (str "layout: " e))))))))
+        (render-diagram! (prog/fn->diagram form))))
     (catch :default e (swap! state assoc :err (str "read: " (.-message e))))))
+
+(defn load-example! [{:keys [code diagram]}]
+  (swap! state assoc :code code :err nil)
+  (if diagram (render-diagram! diagram) (recompute! code)))
 
 ;; ---------------------------------------------------------------------------
 ;; UI
@@ -155,8 +201,12 @@
   (let [{:keys [code nodes edges err]} @state]
     [:div {:style {:display "flex" :height "100vh" :fontFamily "monospace"}}
      [:div {:style {:width "36%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
-      [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8" :fontWeight 600}}
-       "katzen — Clojure as a string diagram"]
+      [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8"
+                     :fontWeight 600 :display "flex" :justifyContent "space-between" :alignItems "center" :gap 8}}
+       [:span "katzen — Clojure as a string diagram"]
+       [:select {:style {:fontSize 11 :fontFamily "inherit" :padding "2px 4px"}
+                 :on-change #(load-example! (nth examples (js/parseInt (.. % -target -value))))}
+        (map-indexed (fn [i {:keys [label]}] [:option {:key i :value i} label]) examples)]]
       [:textarea {:value code :spellCheck false
                   :on-change #(let [v (.. % -target -value)]
                                 (swap! state assoc :code v) (recompute! v))
@@ -164,7 +214,11 @@
                           :padding "12px" :fontSize 13 :fontFamily "monospace" :tabSize 2}}]
       [:div {:style {:padding "6px 12px" :fontSize 11 :color "#586069" :borderTop "1px solid #e1e4e8" :lineHeight 1.6}}
        "● on output = pure (cartesian) · multiple ports = multiple args · ⏚ = dropped binding"
-       [:br] "nested boxes = if / fn body · ↺ dashed = recursion (trace)"]
+       [:br] "nested boxes = if / fn body · ↺ dashed = recursion / feedback (trace)"
+       [:br] "diagrams follow "
+       [:a {:href "https://link.springer.com/book/10.1007/978-3-031-34827-3"
+            :target "_blank" :rel "noopener" :style {:color "#6366f1"}}
+        "Pavlović, Programs as Diagrams (Springer 2023)"]]
       (when err [:pre {:style {:color "#b00" :padding "8px 12px" :margin 0 :fontSize 12}} err])]
      [:div {:style {:flex 1}}
       [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15
