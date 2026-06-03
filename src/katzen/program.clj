@@ -35,24 +35,42 @@
   (not (or (contains? impure sym) (str/ends-with? (name sym) "!"))))
 
 (def ^:private special-forms
-  '#{if when when-not when-let if-let cond condp case do fn fn* loop recur
-     try catch finally throw quote var set! def -> ->> as-> doto})
+  "Forms not yet given diagrammatic structure — rendered as opaque boxes for now
+   (later phases: `fn`/HOF via run/P, `loop`/`recur` via trace, `case` multi-way)."
+  '#{fn fn* loop recur case condp if-let when-let try catch finally throw
+     quote var set! def -> ->> as-> doto})
+
+(defn- cond->if
+  "Desugar `(cond p1 e1 p2 e2 … :else d)` into nested `if`s."
+  [clauses]
+  (when (seq clauses)
+    (let [[p e & more] clauses]
+      (if (= :else p) e (list 'if p e (cond->if more))))))
 
 ;; ---------------------------------------------------------------------------
-;; The functor — a stateful walk threading an env {symbol → out-port}
+;; The functor — a stateful walk threading an env {symbol → out-port}.
+;; `:group` is the current branch path (a vector of [cond-id guard]); boxes
+;; record it so the renderer can nest each conditional branch as a sub-diagram
+;; (the operadic "fill"). Top-level boxes have group [].
 ;; ---------------------------------------------------------------------------
 
 (defn- fresh [state] (let [n (:counter state)] [(update state :counter inc) (str "p" n)]))
 
-(defn- add-box [state {:keys [label pure? ins]}]
+(defn- add-box
+  "Add a box; returns [state out-port box]. Box records the current `:group`,
+   plus optional `:kind`/`:control` (for the cond box)."
+  [state {:keys [label pure? ins kind control]}]
   (let [[state out] (fresh state)
-        box {:id (str "b" (count (:boxes state))) :label label
-             :pure? (boolean pure?) :ins (vec ins) :out out}]
-    [(update state :boxes conj box) out]))
+        box (cond-> {:id (str "b" (count (:boxes state))) :label label
+                     :pure? (boolean pure?) :ins (vec ins)
+                     :group (:group state []) :out out}
+              kind    (assoc :kind kind)
+              control (assoc :control control))]
+    [(update state :boxes conj box) out box]))
 
 (defn- wire [state from to] (update state :wires conj {:from from :to to}))
 
-(declare walk)
+(declare walk walk-cond)
 
 (defn- walk-args [state args]
   (reduce (fn [[st ports] a] (let [[st p] (walk st a)] [st (conj ports p)]))
@@ -71,7 +89,13 @@
                         state binds)]
       (reduce (fn [[st _] e] (walk st e)) [state nil] (rest args)))
 
-    ;; opaque special form (if/fn/loop/…): one box over the bound symbols it uses
+    (= 'do op)       (reduce (fn [[st _] e] (walk st e)) [state nil] args)
+    (= 'if op)       (walk-cond state (first args) (second args) (nth args 2 nil))
+    (= 'when op)     (recur state (list 'if (first args) (cons 'do (rest args))))
+    (= 'when-not op) (recur state (list 'if (list 'not (first args)) (cons 'do (rest args))))
+    (= 'cond op)     (recur state (cond->if args))
+
+    ;; opaque special form (fn/loop/…): one box over the bound symbols it uses
     (special-forms op)
     (let [used (->> (tree-seq coll? seq form)
                     (filter symbol?) (filter (:env state)) distinct)
@@ -87,6 +111,22 @@
                                       :pure? (and (symbol? op) (pure-op? op))
                                       :ins in-ports})]
       [(reduce (fn [st p] (wire st p out)) state in-ports) out])))
+
+(defn- walk-cond
+  "An `(if c t e)`: a `:cond` box (semantics `run(ifte(c, ⌜then⌝, ⌜else⌝), …)` —
+   Dusko) whose two branches are walked into grouped sub-diagrams (the operadic
+   fill). The condition wires in as control; each branch's result wires to the
+   box's output (selection — only one runs at runtime)."
+  [state c t e]
+  (let [[state ctrl]          (walk state c)
+        parent                (:group state [])
+        [state out cond-box]  (add-box state {:label "if" :kind :cond :control ctrl :ins []})
+        cid                   (:id cond-box)
+        branch (fn [st guard expr]
+                 (let [[st bout] (walk (assoc st :group (conj parent [cid guard])) expr)]
+                   (wire st bout out)))
+        state (-> state (branch :then t) (branch :else e) (assoc :group parent))]
+    [(wire state ctrl out) out]))
 
 (defn- walk
   "Walk an expression; return [state out-port]. A bound symbol resolves to its
@@ -117,7 +157,8 @@
         ;; render the inputs as source boxes too
         state (update state :boxes into
                       (map (fn [{:keys [port label]}]
-                             {:id (str "in_" port) :label label :input? true :ins [] :out port})
+                             {:id (str "in_" port) :label label :input? true
+                              :ins [] :out port :group []})
                            inputs))
         [state out] (reduce (fn [[st _] e] (walk st e)) [state nil] body)]
     {:name (some-> fname str)

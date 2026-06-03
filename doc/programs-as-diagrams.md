@@ -117,7 +117,12 @@ load-bearing — they're all serializations of one ACSet.
    params/let/calls/copy/delete + the purity bead — and **render to mermaid**.
    Demo: a real pure Clojure fn shown as a diagram with shared/dropped wires and
    beads, noting the *same* diagram type carries the SIR/control composites.
-3. **`cond` box** (operadic, nested branches).
+3. **`cond` box** (operadic, nested branches) — *done*: `if`/`when`/`cond`
+   become a `:cond` box (a hexagon) whose two branches are walked into grouped
+   sub-diagrams and rendered as nested subgraphs; the condition + both branch
+   outputs wire into the box (selection); shared in-scope values flow into both
+   branches. Semantics = `run(ifte(c, ⌜then⌝, ⌜else⌝), …)` (Dusko, no coproducts);
+   the operadic nesting is Catlab's box-filled-by-a-sub-diagram (`oapply`).
 4. **HOF** via `run`/`P` box.
 5. **Recursion** as a trace-rendered fixpoint.
 6. **Monoidal-operations layer** in katzen (SMC/cartesian/traced theories +

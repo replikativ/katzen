@@ -3,6 +3,7 @@
    must expose the dataflow structure: variable reuse as FAN-OUT (copy), an unused
    binding as a DROPPED box (delete), and pure ops with the cartesian bead."
   (:require [clojure.test :refer [deftest is testing]]
+            [clojure.set]
             [katzen.diagram :as diagram]
             [katzen.program :as prog]))
 
@@ -39,6 +40,36 @@
     (is (false? (:pure? (box-by-label g "atom"))))
     (is (false? (:pure? (box-by-label g "reset!"))))
     (is (false? (:pure? (box-by-label g "deref"))))))
+
+(def ^:private classify-form
+  '(defn classify [x]
+     (let [a (abs x)]
+       (if (pos? x)
+         (str "pos:" a)
+         (vector (- a) x)))))
+
+(deftest conditionals-become-a-cond-box-with-nested-branches
+  (let [g (prog/fn->diagram classify-form)
+        cond-box (first (filter #(= :cond (:kind %)) (:boxes g)))
+        cid (:id cond-box)]
+    (testing "an if produces a :cond box"
+      (is (some? cond-box))
+      (is (= "if" (:label cond-box))))
+    (testing "branches are walked into grouped sub-diagrams (the operadic fill)"
+      (let [groups (set (map :group (:boxes g)))]
+        (is (contains? groups [[cid :then]]) "a then sub-region")
+        (is (contains? groups [[cid :else]]) "an else sub-region")))
+    (testing "the condition and both branch outputs wire into the cond box (selection)"
+      (let [into-cond (->> (:wires g) (filter #(= (:out cond-box) (:to %))) count)]
+        (is (>= into-cond 3) "condition + 2 branch outputs feed the selection")))
+    (testing "a shared in-scope value flows into both branches"
+      (let [a-port (:out (box-by-label g "abs"))
+            then-boxes (set (map :id (filter #(= [[cid :then]] (:group %)) (:boxes g))))
+            else-boxes (set (map :id (filter #(= [[cid :else]] (:group %)) (:boxes g))))
+            p->b (into {} (for [b (:boxes g) :when (:out b)] [(:out b) (:id b)]))
+            targets (->> (:wires g) (filter #(= a-port (:from %))) (map #(p->b (:to %))) set)]
+        (is (seq (clojure.set/intersection targets then-boxes)))
+        (is (seq (clojure.set/intersection targets else-boxes)))))))
 
 (deftest renders-mermaid
   (let [m (prog/fn->mermaid stats-form)]
