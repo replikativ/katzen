@@ -43,6 +43,47 @@
                                     :w (.-width node) :h (.-height node)})]
     (reduce collect-pos acc (or (.-children node) #js []))))
 
+(defn- descendants-of
+  "Set of node ids strictly under group `g` (following the parentId chain)."
+  [pmap g]
+  (set (for [id (keys pmap)
+             :when (loop [p (get pmap id)]
+                     (cond (nil? p) false (= p g) true :else (recur (get pmap p))))]
+         id)))
+
+(defn- group-subdiagram
+  "Intra-function drill-down: the sub-diagram *inside* group `g`, re-rooted as a
+   standalone graph. Wires crossing the boundary become synthetic ports — Dusko's
+   sub-diagram has input ports (the in-scope values it uses) and an output port."
+  [rf g]
+  (let [{:keys [nodes edges]} rf
+        pmap     (parent-map nodes)
+        by-id    (into {} (map (juxt :id identity) nodes))
+        label-of #(get-in by-id [% :data :label] %)
+        inside   (descendants-of pmap g)
+        ;; the group's own contents, with direct children re-rooted to the top
+        focus-nodes (for [{:keys [id parentId] :as n} nodes :when (inside id)]
+                      (cond-> n (= parentId g) (dissoc :parentId)))
+        cross?  (fn [e dir] (case dir
+                              :in  (and (inside (:target e)) (not (inside (:source e))))
+                              :out (and (inside (:source e)) (not (inside (:target e))))))
+        inner   (filter #(and (inside (:source %)) (inside (:target %))) edges)
+        ins     (filter #(cross? % :in) edges)
+        outs    (filter #(cross? % :out) edges)
+        in-ports  (for [s (distinct (map :source ins))]
+                    {:id (str "bin_" s) :type "input"
+                     :data {:label (str (label-of s)) :inputs 0 :boundary? true}})
+        out-ports (for [t (distinct (map :target outs))]
+                    {:id (str "bout_" t) :type "result"
+                     :data {:label (str "→ " (label-of t)) :boundary? true}})
+        in-edges  (for [e ins]  (assoc e :id (str "bin_" (:source e) "->" (:target e))
+                                       :source (str "bin_" (:source e)) :sourceHandle "out"))
+        out-edges (for [e outs] (assoc e :id (str (:source e) "->bout_" (:target e))
+                                       :target (str "bout_" (:target e)) :targetHandle "in-0"))]
+    {:label (str (label-of g))
+     :rf {:nodes (concat in-ports focus-nodes out-ports)
+          :edges (concat in-edges inner out-edges)}}))
+
 ;; ---------------------------------------------------------------------------
 ;; Custom nodes — Dusko's marks (multiple input ports; bead on the output port)
 ;; ---------------------------------------------------------------------------
@@ -74,14 +115,18 @@
         label    (aget d "label")
         pure?    (aget d "pure?")
         dropped? (aget d "dropped?")
+        expand?  (aget d "expandable?")
         n        (max 1 (or (aget d "inputs") 0))]
     (r/as-element
-     [:div {:style (node-css t pure?)}
+     [:div {:style (cond-> (node-css t pure?)
+                     expand? (assoc :border "1.5px solid #6366f1" :cursor "pointer"))
+            :title (when expand? (str "double-click to open " label))}
       (map (fn [i]
              [:> Handle {:key (str "in" i) :type "target" :position (.-Left Position)
                          :id (str "in-" i) :style (in-handle-style n i)}])
            (range n))
-      [:span {:style {:whiteSpace "nowrap"}} label (when dropped? " ⏚")]
+      [:span {:style {:whiteSpace "nowrap"}} label (when dropped? " ⏚")
+       (when expand? [:span {:style {:color "#6366f1" :marginLeft 4 :fontWeight 700}} "⊞"])]
       [:> Handle {:type "source" :position (.-Right Position) :id "out"
                   :style (out-handle-style pure?)}]])))
 
@@ -113,8 +158,19 @@
 ;; State + collapse-aware layout
 ;; ---------------------------------------------------------------------------
 
+;; :rf      — the base (top-level fn) diagram graph {:nodes :edges}
+;; :corpus  — {fn-name(str) → defn-form}, parsed from the textarea (drill targets)
+;; :focus   — a stack of drilled-in frames {:label str :rf {:nodes :edges}}; the
+;;            rendered diagram is the top frame's, or :rf when the stack is empty.
+;;            (Dusko: drilling a call box = run {⌜f⌝}; the stack is the run-stack.)
 (defonce state (r/atom {:code "" :rf nil :dia nil :view :reactflow
+                        :corpus {} :focus []
                         :collapsed #{} :nodes #js [] :edges #js [] :err nil}))
+
+(defn- current-rf
+  "The diagram graph currently in view: the top focus frame, else the base."
+  [{:keys [rf focus]}]
+  (if (seq focus) (:rf (peek focus)) rf))
 
 (defn- ->elk
   "Build an ELK graph from the VISIBLE nodes. Collapsed groups appear as leaves
@@ -144,13 +200,15 @@
          :children (clj->js (mapv node->elk (get by-parent nil)))
          :edges (clj->js (vec elk-edges))}))
 
-(defn- ->rf-nodes [vis-nodes collapsed pos]
+(defn- ->rf-nodes [vis-nodes collapsed pos drillable]
   (clj->js
    (for [{:keys [id type parentId data]} vis-nodes
          :let [{:keys [x y w h]} (get pos id {:x 0 :y 0})
-               collapsed? (contains? collapsed id)]]
+               collapsed? (contains? collapsed id)
+               ;; a plain call box whose label names a known fn → drillable (⊞)
+               expandable? (and (= "box" type) (contains? drillable (:label data)))]]
      (cond-> {:id id :type type
-              :data (assoc (or data {:label id}) :collapsed collapsed?)
+              :data (assoc (or data {:label id}) :collapsed collapsed? :expandable? expandable?)
               :position {:x x :y y}}
        (= "group" type) (assoc :style {:width w :height h
                                        :background (if collapsed? "#f5f3ff" "rgba(148,163,184,0.06)")
@@ -172,21 +230,47 @@
                            :style {:stroke "#a855f7" :strokeWidth 1.5 :strokeDasharray "6 4"})))))))
 
 (defn layout! []
-  (let [{:keys [rf collapsed]} @state]
+  (let [{:keys [collapsed corpus] :as s} @state
+        rf (current-rf s)]
     (when rf
       (let [nodes (:nodes rf) edges (:edges rf)
             pmap  (parent-map nodes)
-            vis   (remove #(hidden? pmap collapsed (:id %)) nodes)]
+            vis   (remove #(hidden? pmap collapsed (:id %)) nodes)
+            drillable (set (keys corpus))]
         (-> (.layout elk (->elk vis pmap collapsed edges))
             (.then (fn [res]
                      (swap! state assoc
-                            :nodes (->rf-nodes vis collapsed (reduce collect-pos {} (.-children res)))
+                            :nodes (->rf-nodes vis collapsed (reduce collect-pos {} (.-children res)) drillable)
                             :edges (->rf-edges edges pmap collapsed)
                             :err nil)))
             (.catch (fn [e] (swap! state assoc :err (str "layout: " e)))))))))
 
 (defn toggle-collapse! [id]
   (swap! state update :collapsed #(if (contains? % id) (disj % id) (conj % id)))
+  (layout!))
+
+;; ---------------------------------------------------------------------------
+;; Drill-down navigation — a focus stack with a breadcrumb (Navigate model).
+;; Intra-function: step into an if/fn GROUP. Inter-function: step into a CALL
+;; box that names a known defn (= evaluate {⌜f⌝} on demand; Dusko §2 run/encode).
+;; ---------------------------------------------------------------------------
+
+(defn drill-into-group! [id]
+  (when-let [frame (group-subdiagram (current-rf @state) id)]
+    (swap! state #(-> % (update :focus conj frame) (assoc :collapsed #{})))
+    (layout!)))
+
+(defn drill-into-fn! [fname]
+  (when-let [form (get-in @state [:corpus fname])]
+    (swap! state #(-> % (update :focus conj {:label fname
+                                             :rf (diagram/->reactflow (prog/fn->diagram form))})
+                      (assoc :collapsed #{})))
+    (layout!)))
+
+(defn focus-to!
+  "Breadcrumb click: keep the first `n` focus frames (n=0 ⇒ back to the base)."
+  [n]
+  (swap! state #(-> % (assoc :focus (vec (take n (:focus %)))) (assoc :collapsed #{})))
   (layout!))
 
 ;; ---------------------------------------------------------------------------
@@ -216,6 +300,8 @@
     :code "(defn scale-all [xs k]\n  (map (fn [x] (* x k)) xs))"}
    {:label "classify — nested conditionals"
     :code "(defn classify [x]\n  (if (pos? x) :pos\n    (if (neg? x) :neg :zero)))"}
+   {:label "variance — inter-function (drill ⊞ into mean / sq)"
+    :code "(defn variance [xs]\n  (let [m (mean xs)]\n    (/ (reduce + 0 (map (fn [x] (sq (- x m))) xs))\n       (count xs))))\n\n(defn mean [xs]\n  (/ (reduce + 0 xs) (count xs)))\n\n(defn sq [x] (* x x))"}
    {:label "UAV control loop — directed machines (dynamics)"
     :diagram control-example
     :code ";; A CONTROL SYSTEM, not Clojure code — the SAME diagram substrate.\n;; sensor → controller → plant, with the plant output fed back to the\n;; sensor (the ↺ trace). Outer inputs: setpoints e, d.  (See doc/composition.md.)"}])
@@ -225,21 +311,31 @@
 (defn- def-form? [form]
   (and (seq? form) (contains? '#{defn defn- fn fn*} (first form))))
 
+(defn- fn-name-of [form]
+  (let [[h n] form] (when (and (contains? '#{defn defn-} h) (symbol? n)) (str n))))
+
 (defn render-diagram! [dia]
-  (swap! state assoc :dia dia :rf (diagram/->reactflow dia) :collapsed #{})
+  (swap! state assoc :dia dia :rf (diagram/->reactflow dia) :collapsed #{} :focus [])
   (layout!))
 
 (defn recompute! [code]
+  ;; Read ALL top-level forms (a mini-namespace), keep the defns as a corpus of
+  ;; drill targets, render the first as the entry point.
   (try
-    (let [form (reader/read-string code)]
-      (if-not (def-form? form)
-        (swap! state assoc :err "Paste a (defn …) or (fn …) form.")
-        (render-diagram! (prog/fn->diagram form))))
+    (let [forms (reader/read-string (str "[" code "\n]"))
+          defs  (filter def-form? forms)]
+      (if (empty? defs)
+        (swap! state assoc :err "Paste one or more (defn …) / (fn …) forms.")
+        (let [corpus (into {} (keep #(when-let [nm (fn-name-of %)] [nm %]) defs))]
+          (swap! state assoc :corpus corpus :err nil)
+          (render-diagram! (prog/fn->diagram (first defs))))))
     (catch :default e (swap! state assoc :err (str "read: " (.-message e))))))
 
 (defn load-example! [{:keys [code diagram]}]
   (swap! state assoc :code code :err nil)
-  (if diagram (render-diagram! diagram) (recompute! code)))
+  (if diagram
+    (do (swap! state assoc :corpus {}) (render-diagram! diagram))
+    (recompute! code)))
 
 ;; ---------------------------------------------------------------------------
 ;; Mermaid view — the SECOND rendering functor off the same diagram value.
@@ -300,8 +396,34 @@
                     :background (if active? "#0f172a" "#fff") :color (if active? "#fff" "#334155")}}
    label])
 
+(defn- breadcrumb [dia focus]
+  (let [base   (or (:name dia) "fn")
+        labels (cons base (map :label focus))
+        n      (count focus)]
+    [:div {:style {:padding "5px 12px" :borderBottom "1px solid #eef0f2" :background "#fff"
+                   :fontSize 11 :display "flex" :alignItems "center" :flexWrap "wrap"}}
+     (map-indexed
+      (fn [i lbl]
+        [:span {:key i :style {:display "inline-flex" :alignItems "center"}}
+         (when (pos? i) [:span {:style {:color "#cbd5e1" :margin "0 5px"}} "›"])
+         [:span {:on-click #(focus-to! i) :title "go to this level"
+                 :style {:cursor "pointer" :userSelect "none"
+                         :fontWeight (if (= i n) 700 400)
+                         :color (if (= i n) "#0f172a" "#6366f1")}}
+          lbl]])
+      labels)
+     (when (zero? n)
+       [:span {:style {:marginLeft 8 :color "#9aa4b2" :fontStyle "italic"}}
+        "— double-click a ⊞ box or a group to drill in"])]))
+
+(defn- on-node-dblclick [_ ^js node]
+  (let [d (.-data node)]
+    (cond
+      (= "group" (.-type node)) (drill-into-group! (.-id node))
+      (aget d "expandable?")    (drill-into-fn! (aget d "label")))))
+
 (defn app []
-  (let [{:keys [code nodes edges err view dia]} @state
+  (let [{:keys [code nodes edges err view dia focus]} @state
         mcode (when dia (diagram/->mermaid dia))]
     [:div {:style {:display "flex" :height "100vh" :fontFamily "monospace"}}
      [:div {:style {:width "36%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
@@ -335,11 +457,13 @@
                    :style {:fontFamily "inherit" :fontSize 11 :padding "3px 10px" :cursor "pointer"
                            :border "1px solid #cbd5e1" :borderRadius 5 :background "#fff" :color "#334155"}}
           "⧉ copy source"])]
+      (when (= view :reactflow) [breadcrumb dia focus])
       [:div {:style {:flex 1 :minHeight 0}}
        (if (= view :mermaid)
          (if mcode ^{:key mcode} [mermaid-view mcode]
              [:div {:style {:padding 16 :color "#586069"}} "No diagram."])
          [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15
+                        :onNodeDoubleClick on-node-dblclick
                         :onNodesChange (fn [changes]
                                          (swap! state update :nodes #(applyNodeChanges changes %)))
                         :onEdgesChange (fn [changes]
