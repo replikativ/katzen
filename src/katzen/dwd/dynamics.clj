@@ -204,7 +204,7 @@
           (fn [sym]
             (cond
               (contains? idx-of sym)   (list 'clojure.core/aget 'u (get idx-of sym))
-              (contains? input-idx sym)(list 'clojure.core/aget 'xs (get input-idx sym))
+              (contains? input-idx sym) (list 'clojure.core/aget 'xs (get input-idx sym))
               (contains? params sym)   (double (get params sym))
               :else nil)))
         ro-leaf-raster
@@ -248,9 +248,9 @@
         (let [idx-of (:index-of layout)
               leaf   (dyn-clj-leaf idx-of)
               form   `(fn [~(with-meta 'du {:tag 'doubles})
-                          ~(with-meta 'u {:tag 'doubles})
-                          ~(with-meta 'xs {:tag 'doubles})
-                          ~'t]
+                           ~(with-meta 'u {:tag 'doubles})
+                           ~(with-meta 'xs {:tag 'doubles})
+                           ~'t]
                         ~@(for [[label expr] field
                                 :let [g (cc/slot layout label)]]
                             `(clojure.core/aset
