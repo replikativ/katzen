@@ -37,6 +37,7 @@ for an attr).
 | ACSets | `katzen.acset` | `vector-acset`, `add-parts`, `subpart`, `incident`; the `PACSet` protocol; `merge-schema`, `rename-schema` |
 | invariants | `katzen.acset.check` | `check-axioms!` — path equations (`:equations`) enforced as data |
 | migration | `katzen.acset.migration` | `schema-morphism`, `migrate` — functorial Δ data migration |
+| (co)limits | `katzen.finset.{limits,colimits}`, `katzen.acset.colimits` | `pullback`/`pushout`/…; ACSet `coproduct` & `pushout` (gluing) |
 | references | `katzen.xref` | pullback over a shared `Identity` attr — cross-ACSet links |
 | type-side | `katzen.eval` | term evaluation: computed properties, validation |
 | aggregation | `katzen.aggregate` | monoid folds (sum / count / min / …): balances, rollups |
