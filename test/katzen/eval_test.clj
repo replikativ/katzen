@@ -25,8 +25,8 @@
         mk (fn [a amt lbl]
              (let [[a it] (a/add-part a :Item)]
                (-> a (a/set-subpart :invoice it inv)
-                     (a/set-subpart :amount it amt)
-                     (a/set-subpart :label it lbl))))
+                   (a/set-subpart :amount it amt)
+                   (a/set-subpart :label it lbl))))
         a (-> a (mk 100 "widget") (mk 250 "gadget") (mk 50 "bolt"))]
     {:acset a :inv inv}))
 

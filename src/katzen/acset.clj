@@ -88,8 +88,8 @@
       (:equations schema)
       (update :equations
               #(mapv (fn [e] (cond-> (-> e (update :dom r)
-                                          (update :lhs (partial mapv r))
-                                          (update :rhs (partial mapv r)))
+                                         (update :lhs (partial mapv r))
+                                         (update :rhs (partial mapv r)))
                                (:codom e) (update :codom r)))
                      %)))))
 

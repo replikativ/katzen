@@ -25,8 +25,8 @@
 (deftest rename-binds-abstract-names-to-store-idents
   (testing "rename-schema renames objects, attr-types, morphisms, dom/codom"
     (let [bound (a/rename-schema kb/schema
-                  {:title :entity/title :employer :entity/employer
-                   :links :entity/links :kind :entity/type})]
+                                 {:title :entity/title :employer :entity/employer
+                                  :links :entity/links :kind :entity/type})]
       (is (a/schema-map? bound))
       (is (= :entity/title (:name (a/attr-by-name bound :entity/title))))
       (is (nil? (a/attr-by-name bound :title)) "old name gone")

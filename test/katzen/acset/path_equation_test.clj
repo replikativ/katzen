@@ -45,9 +45,9 @@
         [g e]  (a/add-part g :E)
         [g re] (a/add-part g :E)
         g (-> g (a/set-subpart :src e v1) (a/set-subpart :tgt e v2)
-                (a/set-subpart :src re v2) (a/set-subpart :tgt re v1))
+              (a/set-subpart :src re v2) (a/set-subpart :tgt re v1))
         g (-> g (a/set-subpart :inv e (if inv-correct? re e))
-                (a/set-subpart :inv re (if inv-correct? e re)))]
+              (a/set-subpart :inv re (if inv-correct? e re)))]
     g))
 
 (deftest check-axioms-validates-path-equations
