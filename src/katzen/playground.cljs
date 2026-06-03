@@ -2,13 +2,17 @@
   "Interactive string-diagram playground: paste a Clojure `defn`/`fn`, see its
    string diagram live (katzen.program → katzen.diagram/->reactflow → ELK layout
    → ReactFlow). The functor + emitter are the shared .cljc code; this ns is the
-   browser shell (the rendering functor's interactive back end)."
+   browser shell (the rendering functor's interactive back end).
+
+   Custom node draws Dusko's visual language: one input HANDLE per argument (his
+   multiple input strings), a filled BEAD on the output port for pure/cartesian
+   boxes, distinct shapes per kind, and recursion as a dashed `↺` trace edge."
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
             [cljs.reader :as reader]
             [katzen.program :as prog]
             [katzen.diagram :as diagram]
-            ["@xyflow/react" :refer [ReactFlow Background Controls MiniMap]]
+            ["@xyflow/react" :refer [ReactFlow Background Controls MiniMap Handle Position]]
             ["elkjs/lib/elk.bundled.js" :default ELK]))
 
 (def elk (ELK.))
@@ -17,15 +21,11 @@
 ;; ELK layout — hierarchy-aware, so cond/fn groups nest as sub-flows
 ;; ---------------------------------------------------------------------------
 
-(defn- ->elk
-  "ReactFlow graph (nodes with :parentId, edges) → an ELK graph (children nest
-   by parentId; layered, left-to-right). Edges go on the lowest common parent;
-   for simplicity we put them all at the root with INCLUDE_CHILDREN handling."
-  [nodes edges]
+(defn- ->elk [nodes edges]
   (let [by-parent (group-by :parentId nodes)
         node->elk (fn node->elk [n]
                     (let [kids (get by-parent (:id n))
-                          base {:id (:id n) :width 130 :height 44}]
+                          base {:id (:id n) :width 120 :height 40}]
                       (if (seq kids)
                         (assoc base
                                :children (mapv node->elk kids)
@@ -49,50 +49,82 @@
     (reduce collect-pos acc (or (.-children node) #js []))))
 
 ;; ---------------------------------------------------------------------------
-;; ReactFlow node styling — Dusko's marks (bead = pure; shapes by kind)
+;; Custom node — Dusko's marks (multiple input ports; bead on the output port)
 ;; ---------------------------------------------------------------------------
 
-(def ^:private kind->builtin
-  {"input" "input" "result" "output" "group" "group"})
+(defn- node-css [t pure?]
+  (merge
+   {:padding "6px 12px" :fontSize 12 :fontFamily "monospace" :minWidth 72
+    :textAlign "center" :background "#fff" :border "1px solid #94a3b8" :borderRadius 6}
+   (case t
+     "input"   {:background "#f0fdf4" :border "1px solid #22c55e" :borderRadius 999}
+     "result"  {:background "#fef2f2" :border "1px solid #ef4444" :borderRadius 999}
+     "cond"    {:background "#fff7ed" :border "2px solid #f59e0b"}
+     "program" {:background "#eef2ff" :border "1px solid #6366f1"}
+     "run"     {:background "#ecfeff" :border "1px solid #06b6d4"}
+     ("recur" "recursive") {:background "#faf5ff" :border "2px dashed #a855f7"}
+     (if pure? {:border "2px solid #0f172a"} {}))))   ; default box; bordered if pure
 
-(defn- node-label [{:keys [data]}]
-  (let [{:keys [label pure? fanout dropped?]} data]
-    (str label
-         (when pure? " •")                        ; cartesian bead
-         (when (> (or fanout 0) 1) (str " ×" fanout)) ; reused (copy / fan-out)
-         (when dropped? " ⏚"))))                  ; dropped binding (delete)
+(defn- in-handle-style [n i]
+  {:top (str (js/Math.round (* (/ (inc i) (inc n)) 100)) "%")
+   :background "#94a3b8" :width 7 :height 7 :border "none"})
 
-(defn- node-style [{:keys [type data]} {:keys [w h]}]
-  (let [{:keys [pure?]} data
-        base {:fontSize 12 :fontFamily "monospace" :borderRadius 6}]
-    (case type
-      "group"   (merge base {:width w :height h :background "rgba(99,102,241,0.06)"
-                             :border "1px dashed #6366f1" :color "#6366f1" :fontWeight 600})
-      "cond"    (merge base {:background "#fff7ed" :border "2px solid #f59e0b"})
-      "program" (merge base {:background "#eef2ff" :border "1px solid #6366f1"})
-      "run"     (merge base {:background "#ecfeff" :border "1px solid #06b6d4"})
-      "input"   (merge base {:background "#f0fdf4" :border "1px solid #22c55e"})
-      "result"  (merge base {:background "#fef2f2" :border "1px solid #ef4444"})
-      (merge base {:background "#fff" :border (if pure? "2px solid #111" "1px solid #999")}))))
+(defn- out-handle-style [pure?]
+  (if pure?
+    {:background "#0f172a" :width 11 :height 11 :border "2px solid #fff"}   ; cartesian bead •
+    {:background "#94a3b8" :width 7 :height 7 :border "none"}))
+
+(defn- render-node [t ^js props]
+  (let [d        (.-data props)
+        label    (aget d "label")
+        pure?    (aget d "pure?")
+        dropped? (aget d "dropped?")
+        n        (max 1 (or (aget d "inputs") 0))]
+    (r/as-element
+     [:div {:style (node-css t pure?)}
+      (map (fn [i]
+             [:> Handle {:key (str "in" i) :type "target" :position (.-Left Position)
+                         :id (str "in-" i) :style (in-handle-style n i)}])
+           (range n))
+      [:span {:style {:whiteSpace "nowrap"}} label (when dropped? " ⏚")]
+      [:> Handle {:type "source" :position (.-Right Position) :id "out"
+                  :style (out-handle-style pure?)}]])))
+
+(def ^:private node-types
+  ;; module-level const (ReactFlow re-renders if nodeTypes identity changes)
+  (let [mk (fn [t] (fn [props] (render-node t props)))]
+    #js {"box" (mk "box") "cond" (mk "cond") "program" (mk "program")
+         "run" (mk "run") "recur" (mk "recur") "recursive" (mk "recursive")
+         "input" (mk "input") "result" (mk "result")}))
+
+;; ---------------------------------------------------------------------------
+;; ReactFlow node/edge data (positions from ELK)
+;; ---------------------------------------------------------------------------
 
 (defn- ->rf-nodes [nodes pos]
   (clj->js
-   (for [{:keys [id type parentId] :as n} nodes
-         :let [p (get pos id {:x 0 :y 0})]]
-     (cond-> {:id id
-              :type (get kind->builtin type "default")
-              :data {:label (node-label n)}
-              :position {:x (:x p) :y (:y p)}
-              :sourcePosition "right" :targetPosition "left"
-              :style (node-style n p)}
+   (for [{:keys [id type parentId data]} nodes
+         :let [{:keys [x y w h]} (get pos id {:x 0 :y 0})]]
+     (cond-> {:id id :type type :data (or data {:label id}) :position {:x x :y y}}
+       (= "group" type) (assoc :style {:width w :height h
+                                       :background "rgba(148,163,184,0.06)"
+                                       :border "1px dashed #94a3b8" :borderRadius 8})
        parentId (assoc :parentId parentId :extent "parent")))))
+
+(defn- ->rf-edges [edges]
+  (clj->js
+   (for [{:keys [id source target sourceHandle targetHandle trace?]} edges]
+     (cond-> {:id id :source source :target target
+              :sourceHandle sourceHandle :targetHandle targetHandle}
+       trace? (assoc :animated true :label "↺"
+                     :style {:stroke "#a855f7" :strokeWidth 1.5 :strokeDasharray "6 4"})))))
 
 ;; ---------------------------------------------------------------------------
 ;; State + recompute
 ;; ---------------------------------------------------------------------------
 
 (def default-code
-  "(defn stats [xs]\n  (let [n      (count xs)\n        total  (reduce + 0 xs)\n        mean   (/ total n)\n        unused (first xs)]\n    (if (pos? n)\n      (vector mean n)\n      (vector 0 0))))")
+  "(defn fact [n acc]\n  (if (pos? n)\n    (recur (dec n) (* n acc))\n    acc))")
 
 (defonce state (r/atom {:code default-code :nodes #js [] :edges #js [] :err nil}))
 
@@ -109,7 +141,7 @@
               (.then (fn [res]
                        (swap! state assoc
                               :nodes (->rf-nodes (:nodes rf) (reduce collect-pos {} (.-children res)))
-                              :edges (clj->js (:edges rf))
+                              :edges (->rf-edges (:edges rf))
                               :err nil)))
               (.catch (fn [e] (swap! state assoc :err (str "layout: " e))))))))
     (catch :default e (swap! state assoc :err (str "read: " (.-message e))))))
@@ -121,24 +153,23 @@
 (defn app []
   (let [{:keys [code nodes edges err]} @state]
     [:div {:style {:display "flex" :height "100vh" :fontFamily "monospace"}}
-     [:div {:style {:width "38%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
-      [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8"
-                     :fontWeight 600}}
+     [:div {:style {:width "36%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
+      [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8" :fontWeight 600}}
        "katzen — Clojure as a string diagram"]
-      [:textarea {:value code
-                  :spellCheck false
+      [:textarea {:value code :spellCheck false
                   :on-change #(let [v (.. % -target -value)]
                                 (swap! state assoc :code v) (recompute! v))
                   :style {:flex 1 :border "none" :outline "none" :resize "none"
                           :padding "12px" :fontSize 13 :fontFamily "monospace" :tabSize 2}}]
-      [:div {:style {:padding "6px 12px" :fontSize 11 :color "#586069" :borderTop "1px solid #e1e4e8"}}
-       "• = pure (cartesian)   ⏚ = dropped binding   nested boxes = if/fn"]
+      [:div {:style {:padding "6px 12px" :fontSize 11 :color "#586069" :borderTop "1px solid #e1e4e8" :lineHeight 1.6}}
+       "● on output = pure (cartesian) · multiple ports = multiple args · ⏚ = dropped binding"
+       [:br] "nested boxes = if / fn body · ↺ dashed = recursion (trace)"]
       (when err [:pre {:style {:color "#b00" :padding "8px 12px" :margin 0 :fontSize 12}} err])]
      [:div {:style {:flex 1}}
-      [:> ReactFlow {:nodes nodes :edges edges :fitView true :minZoom 0.2}
+      [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15}
        [:> Background]
        [:> Controls]
-       [:> MiniMap]]]]))
+       [:> MiniMap {:pannable true :zoomable true}]]]]))
 
 (defn init! []
   (recompute! default-code)

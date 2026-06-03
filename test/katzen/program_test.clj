@@ -86,6 +86,18 @@
     (let [g (prog/fn->diagram '(defn ap [g a] (g a)))]
       (is (= 1 (count (filter #(= :run (:kind %)) (:boxes g))))))))
 
+(deftest recursion-renders-as-a-trace-loop
+  (testing "self-recursion: a self-call is a :recursive box with feedback (trace) edges to the params"
+    (let [g (prog/fn->diagram '(defn fact [n acc] (if (zero? n) acc (fact (dec n) (* n acc)))))]
+      (is (some #(= :recursive (:kind %)) (:boxes g)))
+      (is (= 2 (count (filter :trace? (:wires g)))) "both args feed back to the two params")))
+  (testing "loop/recur: recur feeds back to the loop vars via trace edges"
+    (let [g (prog/fn->diagram '(defn cnt [xs]
+                                 (loop [ys xs n 0]
+                                   (if (seq ys) (recur (rest ys) (inc n)) n))))]
+      (is (some #(= :recur (:kind %)) (:boxes g)))
+      (is (= 2 (count (filter :trace? (:wires g)))) "both loop vars fed back"))))
+
 (deftest reactflow-emits-nested-collapsible-graph
   (let [rf    (diagram/->reactflow (prog/fn->diagram classify-form))
         nodes (:nodes rf)

@@ -101,7 +101,11 @@
 
 (defn- node-type [{:keys [input? kind]}]
   (cond input? "input" (= :cond kind) "cond" (= :program kind) "program"
-        (= :run kind) "run" :else "box"))
+        (= :run kind) "run" (= :recur kind) "recur" (= :recursive kind) "recursive"
+        :else "box"))
+
+(defn- index-of [coll x]
+  (first (keep-indexed (fn [i v] (when (= v x) i)) coll)))
 
 (defn ->reactflow
   "Convert a diagram value to ReactFlow graph data
@@ -113,6 +117,7 @@
    components to draw Dusko's marks."
   [{:keys [boxes wires outputs]}]
   (let [p->b      (port->box boxes)
+        box->ins  (into {} (map (juxt :id :ins) boxes))   ; box id → its ordered input ports
         out-deg   (frequencies (keep #(p->b (:from %)) wires))
         results?  (set (keep p->b outputs))
         with-parent (fn [m path]
@@ -128,20 +133,29 @@
                       (with-parent {:id (group-id path) :type "group"
                                     :data {:label (clojure.core/name (second (last path)))}}
                         (subvec path 0 (dec (count path)))))
-        box-nodes (for [{:keys [id label pure? out] :as b} boxes]
+        box-nodes (for [{:keys [id label pure? out ins] :as b} boxes]
                     (with-parent
                       {:id id :type (node-type b)
                        :data {:label label :pure? (boolean pure?)
+                              :inputs (count ins)            ; # input ports (handles)
                               :fanout (get out-deg id 0)
                               :dropped? (and out (zero? (get out-deg id 0))
                                              (not (results? id)))}}
                       (:group b [])))
         edges (->> (concat
-                    (for [{:keys [from to]} wires
-                          :let [s (p->b from) t (p->b to)] :when (and s t (not= s t))]
-                      {:id (str s "->" t) :source s :target t})
+                    (for [{:keys [from to trace?]} wires
+                          :let [s (p->b from) t (p->b to)
+                                ;; which input port of the target box does `from` feed?
+                                slot (index-of (box->ins t) from)]
+                          :when (and s t (not= s t))]
+                      ;; handles carry ids ("out"/"in-N"), so edges MUST name them
+                      ;; (an id'd handle is not the default) — ReactFlow gotcha.
+                      (cond-> {:id (str s "->" t (when trace? "~")) :source s :target t
+                               :sourceHandle "out" :targetHandle (str "in-" (or slot 0))}
+                        trace? (assoc :trace? true)))
                     (for [o outputs :let [b (p->b o)] :when b]
-                      {:id (str b "->RESULT") :source b :target "RESULT"}))
+                      {:id (str b "->RESULT") :source b :target "RESULT"
+                       :sourceHandle "out" :targetHandle "in-0"}))
                    distinct)]
     {:nodes (concat group-nodes box-nodes
                     [{:id "RESULT" :type "result" :data {:label "result"}}])

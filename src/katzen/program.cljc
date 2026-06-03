@@ -36,8 +36,8 @@
 
 (def ^:private special-forms
   "Forms not yet given diagrammatic structure — rendered as opaque boxes for now
-   (later phase: `loop`/`recur` via trace, `case` multi-way)."
-  '#{loop recur case condp if-let when-let try catch finally throw
+   (`case` multi-way, etc.)."
+  '#{case condp if-let when-let try catch finally throw
      quote var set! def -> ->> as-> doto})
 
 (defn- cond->if
@@ -80,7 +80,7 @@
 
 (defn- wire [state from to] (update state :wires conj {:from from :to to}))
 
-(declare walk walk-cond walk-fn walk-apply)
+(declare walk walk-cond walk-fn walk-apply walk-loop walk-recur)
 
 (defn- walk-args [state args]
   (reduce (fn [[st ports] a] (let [[st p] (walk st a)] [st (conj ports p)]))
@@ -105,6 +105,20 @@
     (= 'when-not op) (recur state (list 'if (list 'not (first args)) (cons 'do (rest args))))
     (= 'cond op)     (recur state (cond->if args))
     (or (= 'fn op) (= 'fn* op)) (walk-fn state form)
+    (= 'loop op)     (walk-loop state (first args) (rest args))
+    (= 'recur op)    (walk-recur state args)
+
+    ;; RECURSION (phase 5, rendered as a trace / feedback loop): a self-call to
+    ;; the defn's own name. The fixpoint's back-edge is drawn to the fn inputs.
+    (and (symbol? op) (= (str op) (:fn-name state)))
+    (let [targets (:recur-targets state)
+          [state in-ports] (walk-args state args)
+          [state out] (add-box state {:label (str op) :kind :recursive :pure? false :ins in-ports})]
+      [(reduce (fn [st [ip tp]]
+                 (cond-> (wire st ip out)
+                   tp (update :wires conj {:from ip :to tp :trace? true})))
+               state (map vector in-ports targets))
+       out])
 
     ;; HIGHER-ORDER application (Dusko: `(f x) = {f} x` = run on a program). The
     ;; op is a LOCAL bound to a program value → apply via a `run` box.
@@ -140,6 +154,35 @@
         ins (cons code arg-ports)
         [state out] (add-box state {:label "apply" :kind :run :pure? false :ins ins})]
     [(reduce (fn [st p] (wire st p out)) state ins) out]))
+
+(defn- walk-loop
+  "A `(loop [v init …] body)`: each loop var is a port (initialised by `init`);
+   `:recur-targets` is rebound to those ports so a `recur` inside feeds back to
+   them (the trace). The loop's value is the body's value."
+  [state binds-vec body]
+  (let [binds  (partition 2 binds-vec)
+        outer  (:recur-targets state)
+        [state targets]
+        (reduce (fn [[st ts] [sym init]]
+                  (let [[st p] (walk st init)] [(assoc-in st [:env sym] p) (conj ts p)]))
+                [state []] binds)
+        [state out] (reduce (fn [[st _] e] (walk st e))
+                            [(assoc state :recur-targets targets) nil] body)]
+    [(assoc state :recur-targets outer) out]))
+
+(defn- walk-recur
+  "A `(recur args…)`: a `:recur` box whose args feed BACK to the current
+   `:recur-targets` (loop vars, or the fn params for self-recursion) via TRACE
+   edges (`:trace? true`) — recursion as a feedback loop (the Kleene fixpoint)."
+  [state args]
+  (let [targets (:recur-targets state)
+        [state arg-ports] (walk-args state args)
+        [state out] (add-box state {:label "recur" :kind :recur :pure? false :ins arg-ports})]
+    [(reduce (fn [st [ap tp]]
+               (cond-> (wire st ap out)
+                 tp (update :wires conj {:from ap :to tp :trace? true})))
+             state (map vector arg-ports targets))
+     out]))
 
 (defn- walk-fn
   "A `(fn [ps] body…)` / `(fn* …)` literal becomes a `:program` box (a quoted
@@ -217,6 +260,9 @@
                              {:id (str "in_" port) :label label :input? true
                               :ins [] :out port :group []})
                            inputs))
+        ;; recursion targets = the param ports (a self-call / recur feeds back here)
+        state (assoc state :fn-name (some-> fname str)
+                           :recur-targets (mapv :port inputs))
         [state out] (reduce (fn [[st _] e] (walk st e)) [state nil] body)]
     {:name (some-> fname str)
      :inputs inputs
