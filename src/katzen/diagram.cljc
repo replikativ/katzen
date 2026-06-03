@@ -81,3 +81,68 @@
       (->> wires (keep edge) distinct)
       (for [o outputs :let [b (p->b o)] :when b]
         (str "  " b " --> RESULT((result))"))))))
+
+;; ============================================================================
+;; ReactFlow — the interactive back end (graph data; layout via ELK in browser)
+;; ============================================================================
+;;
+;; Emits a plain, position-less graph: nodes (boxes + group containers) and
+;; edges. `:group` paths become nested ReactFlow group nodes (`parentId`) — so
+;; `cond` branches and `fn` bodies are collapsible sub-flows. The browser runs a
+;; hierarchy-aware layout (ELK) to assign positions, and custom node components
+;; draw Dusko's marks (the cartesian bead on `:pure?`, copy fan-out, the ⌜·⌝
+;; program/`run` shapes). This is the same diagram value, a different functor.
+
+(defn- group-id
+  "Deterministic id for a `:group` path (a vector of [cond/program-id guard])."
+  [path]
+  (when (seq path)
+    (str "g_" (str/join "_" (map (fn [[c g]] (str c "-" (clojure.core/name g))) path)))))
+
+(defn- node-type [{:keys [input? kind]}]
+  (cond input? "input" (= :cond kind) "cond" (= :program kind) "program"
+        (= :run kind) "run" :else "box"))
+
+(defn ->reactflow
+  "Convert a diagram value to ReactFlow graph data
+   `{:nodes [{:id :type :data :parentId?}] :edges [{:id :source :target}]}`.
+   Position-less and framework-neutral: the playground assigns positions (ELK)
+   and renders. Nodes precede their children (group nodes first, depth-sorted),
+   as ReactFlow requires. `:data` carries `:label`, `:pure?` (the bead),
+   `:fanout` (>1 ⇒ copy), and `:dropped?` (no consumer ⇒ delete) for the node
+   components to draw Dusko's marks."
+  [{:keys [boxes wires outputs]}]
+  (let [p->b      (port->box boxes)
+        out-deg   (frequencies (keep #(p->b (:from %)) wires))
+        results?  (set (keep p->b outputs))
+        with-parent (fn [m path]
+                      (let [pid (group-id path)] (cond-> m pid (assoc :parentId pid))))
+        ;; group container nodes: every distinct non-empty group path + its prefixes
+        group-paths (->> boxes
+                         (map #(:group % []))
+                         (filter seq)
+                         (mapcat (fn [p] (map #(subvec p 0 %) (range 1 (inc (count p))))))
+                         distinct
+                         (sort-by count))
+        group-nodes (for [path group-paths]
+                      (with-parent {:id (group-id path) :type "group"
+                                    :data {:label (clojure.core/name (second (last path)))}}
+                        (subvec path 0 (dec (count path)))))
+        box-nodes (for [{:keys [id label pure? out] :as b} boxes]
+                    (with-parent
+                      {:id id :type (node-type b)
+                       :data {:label label :pure? (boolean pure?)
+                              :fanout (get out-deg id 0)
+                              :dropped? (and out (zero? (get out-deg id 0))
+                                             (not (results? id)))}}
+                      (:group b [])))
+        edges (->> (concat
+                    (for [{:keys [from to]} wires
+                          :let [s (p->b from) t (p->b to)] :when (and s t (not= s t))]
+                      {:id (str s "->" t) :source s :target t})
+                    (for [o outputs :let [b (p->b o)] :when b]
+                      {:id (str b "->RESULT") :source b :target "RESULT"}))
+                   distinct)]
+    {:nodes (concat group-nodes box-nodes
+                    [{:id "RESULT" :type "result" :data {:label "result"}}])
+     :edges edges}))

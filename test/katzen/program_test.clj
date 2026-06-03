@@ -86,6 +86,28 @@
     (let [g (prog/fn->diagram '(defn ap [g a] (g a)))]
       (is (= 1 (count (filter #(= :run (:kind %)) (:boxes g))))))))
 
+(deftest reactflow-emits-nested-collapsible-graph
+  (let [rf    (diagram/->reactflow (prog/fn->diagram classify-form))
+        nodes (:nodes rf)
+        groups (filter #(= "group" (:type %)) nodes)
+        label= (fn [l] (first (filter #(= l (get-in % [:data :label])) nodes)))]
+    (testing "cond branches → collapsible group container nodes"
+      (is (= 2 (count groups)))
+      (is (= #{"then" "else"} (set (map #(get-in % [:data :label]) groups)))))
+    (testing "branch boxes nest under a group via parentId"
+      (let [gids (set (map :id groups))]
+        (is (some #(and (= "box" (:type %)) (contains? gids (:parentId %))) nodes))))
+    (testing "the cond box is typed, and variable reuse is flagged as fan-out (copy)"
+      (is (some #(= "cond" (:type %)) nodes))
+      (is (> (get-in (label= "abs") [:data :fanout]) 1) "abs/a is reused → fan-out > 1"))
+    (testing "a result node + edges into it"
+      (is (some #(= "result" (:type %)) nodes))
+      (is (some #(= "RESULT" (:target %)) (:edges rf))))
+    (testing "parent group nodes precede their children (ReactFlow requirement)"
+      (let [order (zipmap (map :id nodes) (range))]
+        (is (every? (fn [n] (or (nil? (:parentId n)) (< (order (:parentId n)) (order (:id n)))))
+                    nodes))))))
+
 (deftest renders-mermaid
   (let [m (prog/fn->mermaid stats-form)]
     (is (re-find #"flowchart LR" m))
