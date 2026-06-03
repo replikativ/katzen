@@ -1,5 +1,9 @@
 # Katzen
 
+[![Clojars Project](https://img.shields.io/clojars/v/org.replikativ/katzen.svg)](https://clojars.org/org.replikativ/katzen)
+[![CircleCI](https://circleci.com/gh/replikativ/katzen.svg?style=shield)](https://circleci.com/gh/replikativ/katzen)
+[![Slack](https://img.shields.io/badge/slack-join_chat-brightgreen.svg)](https://clojurians.slack.com/archives/C09622F337D)
+[![Docs](https://img.shields.io/badge/docs-clay_notebooks-blue.svg)](https://replikativ.github.io/katzen/)
 [![Last Commit](https://img.shields.io/github/last-commit/replikativ/katzen/main.svg)](https://github.com/replikativ/katzen/commits/main)
 
 **Categorical programming for Clojure. Verified by Lean. Compiled to native numerics.**
@@ -17,6 +21,91 @@ for typed primitive numerical code.
 
 The name nods to *Catlab* — `Katzen` is German for cats. A cat lab, a
 category lab, and an honest sibling to Catlab.jl.
+
+**Quick links**: the [15-minute tutorial](doc/tutorial.md), the
+[concept bridge for Clojurians](doc/for-clojurians.md) (datalog / spec
+/ core.async analogies), the
+[conventions document](doc/CONVENTIONS.md), and the
+[Catlab/GATlab comparison notebook](dev/notebooks/comparison_with_catlab.clj)
+(a runnable side-by-side with the Julia stack).
+
+## Define a category
+
+A *generalized algebraic theory* (GAT) is the data shape Katzen uses
+to specify a category — types, term constructors, axioms. Here's
+`ThCategory`, ported verbatim from
+[GATlab.jl](https://github.com/AlgebraicJulia/GATlab.jl/blob/main/src/stdlib/theories/categories.jl):
+
+```clojure
+(require '[katzen.theory :refer [deftheory]])
+
+(deftheory ThCategory
+  (type Ob)                                     ; objects
+  (type Hom [dom Ob, codom Ob])                 ; morphisms — dependent type
+  (term compose
+    :ctx [a Ob, b Ob, c Ob]
+    :args [f (Hom a b), g (Hom b c)]
+    :ret  (Hom a c))                            ; composition
+  (term id
+    :ctx [a Ob]
+    :ret  (Hom a a))                            ; identity
+  (axiom assoc
+    :ctx [a Ob, b Ob, c Ob, d Ob,
+          f (Hom a b), g (Hom b c), h (Hom c d)]
+    (= (compose (compose f g) h)
+       (compose f (compose g h))))
+  (axiom unit-left  :ctx [a Ob, b Ob, f (Hom a b)] (= (compose (id a) f) f))
+  (axiom unit-right :ctx [a Ob, b Ob, f (Hom a b)] (= (compose f (id b)) f)))
+```
+
+The standard library (`katzen.stdlib.core`) ships `ThCategory`,
+`ThMonoid`, `ThGroup`, `ThSchema`, `ThSymmetricMonoidalCategory`, and
+`ThGraph`. The worked algebra hierarchy `ThSemigroup → ThCommutativeMonoid
+→ ThGroup → ThAbelianGroup` lives in `katzen.library.algebra.*`.
+
+A *model* of a theory is a Clojure implementation: `(definstance
+NatAddMonoid ThMonoid ...)` says "natural numbers under + form a
+monoid." A *symbolic model* is one that builds expression trees instead
+of computing values: `(defsymbolic SymMonoid ThMonoid)`. Both satisfy
+the same axioms — but one runs the math and the other constructs ASTs.
+
+## What this gives you that `cats` doesn't
+
+Clojure already has [funcool/cats](https://github.com/funcool/cats) —
+a great library for monads, functors, and applicatives as everyday FP
+abstractions. Katzen sits on a different axis:
+
+| | `funcool/cats` | Katzen |
+|---|---|---|
+| Style | Type classes for FP idioms (monad, applicative, semigroup) | Whole categories as first-class data (theories, ACSets, wiring diagrams) |
+| Focus | Compose functions and effects within Clojure | Reason about *whole languages* and *whole data shapes* compositionally |
+| Translation between systems | Monad transformers | Theory / schema morphisms with kernel-verified axiom preservation |
+| Composition of subsystems | `do` notation, applicative builders | Operadic `oapply` over UWDs / DWDs / CPGs |
+| Verification | Convention — your monad satisfies the laws if you say so | Optional ansatz Lean kernel discharges axiom obligations |
+| Numerical compile | n/a | `compile-rhs` → typed `raster.fn.IFn__doubles_doubles_double` |
+
+The two libraries complement rather than compete. You can write a
+monadic computation in `cats` whose carrier types come from Katzen
+ACSets; you can use Katzen's UWD composition to plan a dataflow whose
+boxes are `cats` monadic pipelines.
+
+## A category of Clojure programs
+
+The `katzen.examples.clojure-*` namespaces work an instructive example:
+a GAT `ThClojureCore` defining a small Clojure-like language (literals,
+variables, lambdas, application, `let`, `if`), together with two
+models. `StandardEval` interprets each term constructor as eager call-by-
+value evaluation. `SymbolicClojure` interprets each term constructor as
+an AST node — same syntax, different semantics, both functorial.
+
+This is exactly the kind of categorical thinking Catlab/GATlab make
+practical: instead of writing an evaluator and a separate AST builder
+that drift, you write the *theory* once and provide two *models*. The
+fact that `SymbolicClojure` produces a `StandardEval`-interpretable
+output is then a theory morphism, kernel-verifiable through ansatz.
+
+See `src/katzen/examples/clojure_core.clj` for the theory and the
+two models in `clojure_eval.clj` / `clojure_symbolic.clj`.
 
 ```clojure
 (require '[katzen.petri :as p])

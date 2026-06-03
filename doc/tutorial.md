@@ -242,6 +242,57 @@ preservation. The base GATlab.jl explicitly leaves this as a TODO
 
 ---
 
+## Part 5 — A category of Clojure programs (optional)
+
+**Goal**: see one theory carrying *two* interpretations — call-by-value
+evaluation and AST construction — over the same syntax. This is the
+categorical-programming move: theory once, models many.
+
+```clojure
+;; The theory: a small Clojure-like language as a GAT.
+(require '[katzen.examples.clojure-core :refer [ThClojureCore]])
+
+;; Two models of that theory.
+(require '[katzen.examples.clojure-eval :refer [StandardEval]])         ; runs code
+(require '[katzen.examples.clojure-symbolic :refer [SymbolicClojure]])  ; builds ASTs
+
+;; Same surface syntax, two different categories of "value":
+;;
+;;   StandardEval.lit-num    : Number → Value      (the number itself)
+;;   StandardEval.lam        : Sym × Expr → Value  (a Clojure closure)
+;;   StandardEval.app        : Value × Value → Value
+;;
+;;   SymbolicClojure.lit-num : Number → Expr       ({:head :lit-num :args [n]})
+;;   SymbolicClojure.lam     : Sym × Expr → Expr   ({:head :lam :args [sym body]})
+;;   SymbolicClojure.app     : Expr × Expr → Expr
+;;
+;; The functor witnessed by `eval-with` between SymbolicClojure and
+;; StandardEval IS the "interpreter": given an AST built by the symbolic
+;; model, produce the value the eval model would have produced directly.
+```
+
+What just happened: by writing the *theory* `ThClojureCore` once and
+providing two *models* (`StandardEval`, `SymbolicClojure`), you get two
+non-trivial functors into different target categories — `Set` (values)
+for one, the syntactic category of ASTs for the other. No drift between
+the evaluator and the AST builder; they share the theory's term
+constructors as their interface.
+
+This is the kind of categorical thinking the Catlab/GATlab tradition
+makes practical. The Clojure library [funcool/cats](https://github.com/funcool/cats)
+gives you monads, applicatives, and functors as *FP type classes for
+working inside Clojure*. Katzen gives you *whole languages and whole
+data shapes as composable categorical objects* — translation between
+them happens via theory morphisms, not monad transformers.
+
+See `src/katzen/examples/clojure_core.clj` for the theory and the two
+models in `clojure_eval.clj` / `clojure_symbolic.clj`. For a complete
+walkthrough of theory-morphisms-as-translations, the
+[comparison notebook](../dev/notebooks/comparison_with_catlab.clj)
+ties this back to migration and verification.
+
+---
+
 ## Where to next
 
 - **Compose more interesting dynamics**: `katzen.dwd.dynamics` for
