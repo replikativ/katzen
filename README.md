@@ -76,7 +76,7 @@ An SIR epidemic is the composite of two reaction networks that **share the
 infected population** `I` (the same move as Lotka–Volterra sharing its prey):
 
 ```clojure
-(require '[katzen.petri :as p] '[katzen.uwd :as uwd]
+(require '[katzen.petri :as p] '[katzen.uwd :as uwd] '[katzen.compose :refer [oapply]]
          '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
 
 ;; two primitive reaction networks
@@ -93,8 +93,8 @@ infected population** `I` (the same move as Lotka–Volterra sharing its prey):
       [d B1 _] (uwd/add-box-with-ports d (take 2 js))
       [d B2 _] (uwd/add-box-with-ports d (drop 1 js))
       ;; oapply identifies the shared I, sums the dynamics → one composite system
-      sir (ud/oapply d {B1 (ud/from-compilable (p/petri-dynamics (infection) {1 (/ 0.3 1000.0)}) [1 2])
-                        B2 (ud/from-compilable (p/petri-dynamics (recovery)  {1 0.1})           [1 2])})
+      sir (oapply d {B1 (ud/from-compilable (p/petri-dynamics (infection) {1 (/ 0.3 1000.0)}) [1 2])
+                     B2 (ud/from-compilable (p/petri-dynamics (recovery)  {1 0.1})           [1 2])})
       rhs (cc/compile-clojure-rhs sir)]
   (cc/layout-of sir)                                    ; => 3 state classes: S, I, R (I merged, not duplicated)
   (last (:us (p/integrate-rk4 rhs [999.0 1.0 0.0] 0.0 100.0 0.5))))
@@ -114,7 +114,7 @@ death **sharing the prey and predator populations**:
 
 ```clojure
 (require '[katzen.ode :as ode] '[katzen.uwd :as uwd] '[katzen.petri :as p]
-         '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
+         '[katzen.compose :refer [oapply]] '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
 
 (let [growth    (ode/vector-field {:states '[r]   :params '{a 1.1} :field '{r (* a r)}})
       predation (ode/vector-field {:states '[r f] :params '{b 0.4 d 0.1}
@@ -124,9 +124,9 @@ death **sharing the prey and predator populations**:
       [d Bg _] (uwd/add-box-with-ports d [jR])      ; growth touches the prey R
       [d Bp _] (uwd/add-box-with-ports d [jR jF])   ; predation couples R and F
       [d Bd _] (uwd/add-box-with-ports d [jF])      ; death touches the predator F
-      lv  (ud/oapply d {Bg (ud/from-compilable growth    '[r])
-                        Bp (ud/from-compilable predation '[r f])
-                        Bd (ud/from-compilable death     '[f])})]
+      lv  (oapply d {Bg (ud/from-compilable growth    '[r])
+                     Bp (ud/from-compilable predation '[r f])
+                     Bd (ud/from-compilable death     '[f])})]
   (cc/layout-of lv)   ; => 2 state classes: R, F (prey/predator merged across the 3 boxes)
   (last (:us (p/integrate-rk4 (cc/compile-clojure-rhs lv) [10.0 10.0] 0.0 20.0 0.001))))
 ;; the composite conserves the LV first integral to ~1e-12 — a correct closed orbit
@@ -140,14 +140,15 @@ ports, and a state-only **readout**; wires feed outputs to inputs, so feedback i
 well-defined. This is the substrate for control systems (sensor → controller →
 plant → back). `katzen.dwd.dynamics` gives you `raw-machine` (opaque closure) and
 `vector-machine` (symbolic, fast raster path) — the directed siblings of
-`raw-field` / `vector-field` — composed with `oapply-dwd`.
+`raw-field` / `vector-field` — composed with the same `oapply`.
 
 A minimal closed loop: a plant (integrator `ẋ = u`) and a first-order controller
 tracking the error `r − x`, wired so the plant's output feeds **back** into the
 controller and the setpoint `r` is the outer input:
 
 ```clojure
-(require '[katzen.dwd :as dwd] '[katzen.dwd.dynamics :as m] '[katzen.petri :as p])
+(require '[katzen.dwd :as dwd] '[katzen.dwd.dynamics :as m] '[katzen.petri :as p]
+         '[katzen.compose :refer [oapply]])
 
 (def plant (m/raw-machine {:state-labels [:x] :inputs 1                ; ẋ = u
                            :dynamics (fn [[x] [u] _] [u]) :readout (fn [[x] _] [x])}))
@@ -164,7 +165,7 @@ controller and the setpoint `r` is the outer input:
         [d _] (dwd/add-box-wire    d (nth pout 0) (nth cin 0))   ; plant x → controller (feedback)
         [d _] (dwd/add-input-wire  d r (nth cin 1))              ; setpoint → controller
         [d _] (dwd/add-output-wire d (nth pout 0) y)]
-    (m/oapply-dwd d {Bp plant Bc ctrl})))
+    (oapply d {Bp plant Bc ctrl})))           ; same oapply as the undirected examples
 
 ;; drive with setpoint r = 1 and integrate — the closed loop tracks it:
 (last (:us (p/integrate-rk4 (m/signal-rhs feedback-loop [1.0]) (double-array [0.0 0.0]) 0.0 10.0 0.01)))
@@ -353,6 +354,7 @@ clojure -M:dev:raster:ansatz -m notebooks.comparison-with-catlab
 | Symbolic normalization | `katzen.acset.normalize`, `katzen.symbolic.normalize` `normalize`, `equiv?` | [GATlab.jl `GATExprUtils`](https://github.com/AlgebraicJulia/GATlab.jl/blob/main/src/models/GATExprUtils.jl) |
 | Lean-kernel verification | `katzen.ansatz.export`, `katzen.acset.theory-bridge` `check-theory!`, `verify-schema-morphism!`, `verified-migrate` | none — GATlab's `TheoryMaps.jl:256` has an open TODO |
 | FinSet (co)limits | `katzen.finset.limits`, `katzen.finset.colimits` `product`, `pullback`, `coproduct`, `pushout` | [Catlab.jl `FinSet` limits](https://github.com/AlgebraicJulia/Catlab.jl/tree/main/src/categorical_algebra/setcats) |
+| Operadic composition (unified) | `katzen.compose` `oapply` — one entry over all operads × algebras | [Catlab/AlgebraicDynamics `oapply`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl) (multiple dispatch) |
 | UWD composition | `katzen.uwd.dynamics` `uwd`, `oapply` | [AlgebraicDynamics.jl `uwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
 | DWD composition (directed / control) | `katzen.dwd.dynamics` `oapply-dwd`, `raw-machine`, `vector-machine`, `eval-dynamics`, `signal-rhs` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
 | Circular port graphs | `katzen.cpg` | [AlgebraicDynamics.jl `cpg_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/cpg_dynam.jl) |
