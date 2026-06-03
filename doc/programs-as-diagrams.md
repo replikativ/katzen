@@ -89,6 +89,66 @@ are understood as the classical counterparts, to revisit):
   earlier "operadic" framing was wrong — `oapply` is *static* composition of
   whole diagrams, not runtime branch selection.)
 
+## 3a. Beyond Catlab's `@program`: the `ifte` extension
+
+katzen's `katzen.program/⟦·⟧` is the Clojure analog of Catlab's
+[`@program`](https://github.com/AlgebraicJulia/Catlab.jl/blob/main/src/programs/ParseJuliaPrograms.jl)
+(`ParseJuliaPrograms.jl`): both parse a function body into a wiring diagram by
+treating variables as wires and calls as boxes. But Catlab's `@program` is
+deliberately **straight-line** — it builds a morphism in a *free symmetric
+monoidal category*, and there it stops. It has **no `if`**. This is not an
+oversight; it is a theorem about what a monoidal category can express:
+
+> **Branching is not a monoidal primitive.** `compose` and `otimes` (`∘`, `⊗`)
+> build a fixed dataflow graph. "Run this part *or* that part depending on a
+> value computed at runtime" is a different operation — it needs *more structure*
+> than a plain SMC has.
+
+There are two principled ways to add that structure, and they correspond to two
+literatures:
+
+1. **The classical route — coproducts + distributivity.** In a *distributive
+   monoidal category*, `Bool = I + I`, and `if` is the copairing
+   `[t, e] : (I + I) ⊗ A → B` post-composed with the distributor. This is the
+   route a CCC / a bicartesian category takes. Pavlović names it (§1.7.3) and
+   *deliberately sets it aside*, because it forces totality and erases program
+   identity.
+
+2. **The route katzen takes — the monoidal computer (Pavlović).** Add a program
+   object `P` and a universal evaluator `run : P × A → B`. Then a conditional is
+   **lazy branching** (*Programs as Diagrams* §3.6.1, Eq. 3.31):
+
+   > `ift(c, F, G) = {{c}(F, G)}`,  with `F = ⌜then⌝`, `G = ⌜else⌝ ∈ P`.
+
+   Read it inside-out: the branches are first *reified as program codes* `⌜then⌝`,
+   `⌜else⌝` (elements of `P` — **data, not yet running**). The inner `{c}(F, G)`
+   uses the condition to **select one code**. The outer `{·}` (`run`) then
+   **evaluates the selected code**. The branch that wasn't selected is never run —
+   laziness is automatic, because selection happens on codes and `run` touches
+   only the winner. A well-defined `if` wants a **decidable** predicate: `c` pure
+   and total, i.e. carrying the cartesian bead (§2.4.1).
+
+This is why the monoidal-computer framing earns its keep: the **same** `P`/`run`
+that models `eval`, `fn`-as-value, and recursion *also* gives `if`, with no extra
+axioms. "The branches are programs" is literally the *programs-are-data* thesis —
+a conditional is two pieces of code and a chooser. (An earlier draft of this work
+mislabeled the cond box "operadic"; that was wrong. `oapply` is *static*
+composition of whole diagrams — it has no runtime selection. The conditional is
+pure monoidal computer.)
+
+**How katzen renders it.** `⟦(if c t e)⟧` emits a `:cond` box (drawn as a
+hexagon) whose control input is `⟦c⟧`, with `⟦t⟧` and `⟦e⟧` walked into two
+**nested sub-diagrams** (the reified branch codes ⌜·⌝); both branch outputs wire
+into the box (the selection), and any in-scope value used by a branch flows into
+that branch. Drawing *both* branches exposes the structure; that only *one* runs
+is the semantics (§4). `when`/`when-not`/`cond` desugar to `if`; `case`/`condp`
+are still opaque boxes (multi-way selection — a fold of `ift`, future work).
+
+The net effect: katzen's functor handles the part of real Clojure that Catlab's
+`@program` cannot, and it does so by *importing a named construction from a
+published formalism* rather than bolting on an ad-hoc `if` node. That is the
+whole discipline of this document, applied to the one place it matters most.
+
 ## 4. Semantics vs rendering — the anti-frankenstein rule
 
 The morphism a diagram denotes is a coherent CD-category term. **What we draw is a
