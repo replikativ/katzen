@@ -101,9 +101,14 @@
        (every? (fn [[i v]] (= i v)) (map-indexed vector (:vals f)))))
 
 (defn compose
-  "Compose f: A → B with g: B → C, returning f ;; g : A → C (left-to-right;
-   the result on x is g(f(x))). Composition is *eager*: a fresh vector is
-   built. Identities on either side short-circuit."
+  "Compose f: A → B with g: B → C, returning f ⋅ g : A → C.
+
+   CONVENTION (shared by every `compose` in katzen — finset, ACSet
+   morphisms, theory morphisms; unified at `katzen.cat/compose`):
+   DIAGRAMMATIC order — the FIRST argument is applied first. `(compose
+   f g)` requires `codom(f) = dom(g)` and acts as `g(f(x))` (classical
+   `g ∘ f`). Composition is *eager*: a fresh vector is built. Identities
+   on either side short-circuit."
   [f g]
   (when-not (= (:n (cod f)) (:n (dom g)))
     (throw (ex-info "FinFunction compose: codom(f) must equal dom(g)"

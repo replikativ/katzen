@@ -466,10 +466,10 @@
 ;;; ============================================================================
 
 (defn compose-morphisms
-  "Compose two theory morphisms: g ∘ f.
-
-  The result maps from dom(f) to codom(g).
-  Requires codom(f) = dom(g)."
+  "Compose two theory morphisms. DIAGRAMMATIC order, the shared katzen
+  convention (see `katzen.cat/compose`): the FIRST argument is applied
+  first. `(compose-morphisms f g)` maps dom(f) → codom(g), acting as
+  `g ∘ f`; requires codom(f) = dom(g)."
   [f g]
   (when-not (= (codom f) (dom g))
     (throw (ex-info "Cannot compose morphisms - codomain of f must equal domain of g"
