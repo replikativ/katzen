@@ -64,7 +64,9 @@ functions call graph) to a wiring diagram.
 | binding used 0× | **delete** `▪` (ground, explicit) | comonoid (CD) |
 | **pure, total fn** | the **cartesian bead `•`** — licenses CSE/DCE | cartesian sub-cat |
 | `(if c t e)` | a **`cond` box**: a control port + the two branches as **nested sub-diagrams** (= the branch program-codes) | **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = {{c}(⌜t⌝, ⌜e⌝)}` — select a program code via `{c}`, then `run` it; only one branch runs (Pavlović §3.6.1, Eq 3.31). A well-defined `if` wants a **decidable** (pure/total = beaded) predicate (§2.4.1). |
-| `(fn …)` / HOF (`map`, `comp`) | an element of the **program object `P`** + a **`run`/apply box** | monoidal computer |
+| `(fn …)` literal | a **`:program` box** ⌜·⌝ (an element of `P`) with its body as a nested sub-diagram; free vars wire in as the closure | monoidal computer |
+| applying a fn value: `(g x)` (g local), `((fn …) x)`, HOF | a **`:run`/apply box** — Dusko's `{g} x` | monoidal computer |
+| bare fn ref as a value (`inc` in `(map inc xs)`) | a **`:program` code box** ⌜inc⌝ | monoidal computer |
 | `loop`/`recur`, self-recursion | a **trace feedback loop** (rendering) | semantics: Kleene **fixpoint** (`run`+copy) |
 | atoms / channels / shared state | a **junction** (shared resource) | hypergraph / UWD |
 
@@ -134,7 +136,7 @@ load-bearing — they're all serializations of one ACSet.
    code, then `run` it; only one branch runs. Pure monoidal computer — no operad,
    no coproduct. (The nested-branch *drawing* is the view; that both are drawn
    exposes structure, that one runs is the semantics.)
-4. **HOF** via `run`/`P` box.
+4. **HOF** via `run`/`P` box — *done*: `fn` literals are `:program` boxes ⌜·⌝ (body nested); applying a fn value is a `:run`/apply box (`{g} x`); a bare fn ref is a `:program` code box. Pure monoidal computer (programs are data).
 5. **Recursion** as a trace-rendered fixpoint.
 6. **Monoidal-operations layer** in katzen (SMC/cartesian/traced theories +
    wiring-diagram `copy`/`delete`/`trace`); **ReactFlow** renderer in simmis.

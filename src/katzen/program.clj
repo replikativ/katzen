@@ -36,8 +36,8 @@
 
 (def ^:private special-forms
   "Forms not yet given diagrammatic structure — rendered as opaque boxes for now
-   (later phases: `fn`/HOF via run/P, `loop`/`recur` via trace, `case` multi-way)."
-  '#{fn fn* loop recur case condp if-let when-let try catch finally throw
+   (later phase: `loop`/`recur` via trace, `case` multi-way)."
+  '#{loop recur case condp if-let when-let try catch finally throw
      quote var set! def -> ->> as-> doto})
 
 (defn- cond->if
@@ -46,6 +46,16 @@
   (when (seq clauses)
     (let [[p e & more] clauses]
       (if (= :else p) e (list 'if p e (cond->if more))))))
+
+(defn- fn-first-clause
+  "From a `(fn name? …)` / `(fn* …)` form return [params body…] for its first
+   arity (multi-arity falls to the first clause)."
+  [form]
+  (let [more (rest form)
+        more (if (symbol? (first more)) (rest more) more)]   ; optional self-name
+    (if (vector? (first more))
+      [(first more) (rest more)]                             ; (fn [ps] body…)
+      (let [[ps & body] (first more)] [ps body]))))          ; (fn* ([ps] body…) …)
 
 ;; ---------------------------------------------------------------------------
 ;; The functor — a stateful walk threading an env {symbol → out-port}.
@@ -70,7 +80,7 @@
 
 (defn- wire [state from to] (update state :wires conj {:from from :to to}))
 
-(declare walk walk-cond)
+(declare walk walk-cond walk-fn walk-apply)
 
 (defn- walk-args [state args]
   (reduce (fn [[st ports] a] (let [[st p] (walk st a)] [st (conj ports p)]))
@@ -94,8 +104,14 @@
     (= 'when op)     (recur state (list 'if (first args) (cons 'do (rest args))))
     (= 'when-not op) (recur state (list 'if (list 'not (first args)) (cons 'do (rest args))))
     (= 'cond op)     (recur state (cond->if args))
+    (or (= 'fn op) (= 'fn* op)) (walk-fn state form)
 
-    ;; opaque special form (fn/loop/…): one box over the bound symbols it uses
+    ;; HIGHER-ORDER application (Dusko: `(f x) = {f} x` = run on a program). The
+    ;; op is a LOCAL bound to a program value → apply via a `run` box.
+    (and (symbol? op) (contains? (:env state) op))
+    (walk-apply state (get-in state [:env op]) args)
+
+    ;; opaque special form (loop/recur/…): one box over the bound symbols it uses
     (special-forms op)
     (let [used (->> (tree-seq coll? seq form)
                     (filter symbol?) (filter (:env state)) distinct)
@@ -103,7 +119,11 @@
           [state out] (add-box state {:label (str op) :pure? false :ins in-ports})]
       [(reduce (fn [st p] (wire st p out)) state in-ports) out])
 
-    ;; ordinary call op(args…)
+    ;; op is an expression evaluating to a program (a fn-literal, `(comp …)`, …)
+    ;; → run it on the args.
+    (seq? op) (let [[state code] (walk state op)] (walk-apply state code args))
+
+    ;; ordinary call to a named (global) op
     :else
     (let [[state in-ports] (walk-args state args)
           label (if (symbol? op) (str op) (pr-str op))
@@ -111,6 +131,38 @@
                                       :pure? (and (symbol? op) (pure-op? op))
                                       :ins in-ports})]
       [(reduce (fn [st p] (wire st p out)) state in-ports) out])))
+
+(defn- walk-apply
+  "Apply a program `code` (a P-typed value port) to `args` via a `:run` box —
+   Dusko's `{code} args`. The selected program runs on the arguments."
+  [state code args]
+  (let [[state arg-ports] (walk-args state args)
+        ins (cons code arg-ports)
+        [state out] (add-box state {:label "apply" :kind :run :pure? false :ins ins})]
+    [(reduce (fn [st p] (wire st p out)) state ins) out]))
+
+(defn- walk-fn
+  "A `(fn [ps] body…)` / `(fn* …)` literal becomes a `:program` box (a quoted
+   program code ⌜·⌝, Dusko's element of P). Its body is walked into a nested
+   sub-diagram (params = the program's inputs; free vars wire in as the closure);
+   the box's out-port is the program code, consumed by a `:run` box on application."
+  [state form]
+  (let [parent     (:group state [])
+        outer-env  (:env state)
+        [state out prog] (add-box state {:label "fn" :kind :program :ins []})
+        gpath      (conj parent [(:id prog) :body])
+        [params body] (fn-first-clause form)
+        params     (remove #{'&} params)
+        state (reduce (fn [st p]
+                        (let [[st port] (fresh st)]
+                          (-> st (assoc-in [:env p] port)
+                              (update :boxes conj {:id (str "fnin_" port) :label (str p)
+                                                   :input? true :ins [] :out port :group gpath}))))
+                      (assoc state :group gpath) params)
+        [state bout] (reduce (fn [[st _] e] (walk st e)) [state nil] body)
+        state (cond-> state bout (wire bout out))]
+    ;; restore the outer env (params/inner lets don't leak) and group
+    [(assoc state :group parent :env outer-env) out]))
 
 (defn- walk-cond
   "An `(if c t e)`: a `:cond` box implementing Pavlović's LAZY branching (§3.6.1,
@@ -133,12 +185,14 @@
 
 (defn- walk
   "Walk an expression; return [state out-port]. A bound symbol resolves to its
-   port (reuse fans out naturally); a literal/free symbol becomes a 0-input box."
+   port (reuse fans out naturally); a free symbol is a program/var reference
+   `⌜x⌝` (a `:program` value — e.g. `inc` passed to `map`); a literal is a const box."
   [state expr]
   (cond
     (and (symbol? expr) (contains? (:env state) expr)) [state (get-in state [:env expr])]
-    (seq? expr) (walk-call state expr)
-    :else (add-box state {:label (pr-str expr) :pure? true :ins []})))
+    (seq? expr)   (walk-call state expr)
+    (symbol? expr)(add-box state {:label (str expr) :kind :program :pure? true :ins []})
+    :else         (add-box state {:label (pr-str expr) :pure? true :ins []})))
 
 (defn fn->diagram
   "Project a `(defn name [params] body…)` or `(fn [params] body…)` form into a

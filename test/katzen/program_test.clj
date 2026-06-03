@@ -71,6 +71,21 @@
         (is (seq (clojure.set/intersection targets then-boxes)))
         (is (seq (clojure.set/intersection targets else-boxes)))))))
 
+(deftest higher-order-via-run-and-program-codes
+  (testing "a fn literal is a :program code box ⌜·⌝ with its body nested"
+    (let [g (prog/fn->diagram '(defn sq [n] ((fn [x] (* x x)) n)))
+          pbox (first (filter #(= :program (:kind %)) (:boxes g)))]
+      (is (some? pbox))
+      (is (= "fn" (:label pbox)))
+      (is (some #(= [[(:id pbox) :body]] (:group %)) (:boxes g)) "body in a nested group")
+      (is (some #(= :run (:kind %)) (:boxes g)) "applied via a run box")))
+  (testing "a bare fn ref passed as a value is a :program code box (⌜inc⌝)"
+    (let [g (prog/fn->diagram '(defn f [xs] (map inc xs)))]
+      (is (some #(and (= :program (:kind %)) (= "inc" (:label %))) (:boxes g)))))
+  (testing "applying a local fn value emits a :run/apply box (Dusko: {g} a)"
+    (let [g (prog/fn->diagram '(defn ap [g a] (g a)))]
+      (is (= 1 (count (filter #(= :run (:kind %)) (:boxes g))))))))
+
 (deftest renders-mermaid
   (let [m (prog/fn->mermaid stats-form)]
     (is (re-find #"flowchart LR" m))

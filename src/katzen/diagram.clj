@@ -33,9 +33,11 @@
   [pad esc {:keys [id label pure? input? kind]}]
   (str pad id
        (cond
-         input?            (str "([\"" (esc label) "\"])")
-         (= :cond kind)    (str "{{\"" (esc label) "\"}}")     ; hexagon = cond/selection
-         pure?             (str "[[\"" (esc label) "\"]]")     ; doubled border = pure
+         input?            (str "([\"" (esc label) "\"])")        ; stadium = input port
+         (= :cond kind)    (str "{{\"" (esc label) "\"}}")        ; hexagon = cond/selection
+         (= :program kind) (str "[/\"" (esc label) "\"/]")        ; parallelogram = program code ⌜·⌝
+         (= :run kind)     (str "[/\"" (esc label) "\"\\]")       ; trapezoid = apply (run)
+         pure?             (str "[[\"" (esc label) "\"]]")        ; doubled border = pure
          :else             (str "[\"" (esc label) "\"]"))))
 
 (defn- emit-groups
