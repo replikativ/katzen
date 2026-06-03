@@ -12,7 +12,8 @@
             [cljs.reader :as reader]
             [katzen.program :as prog]
             [katzen.diagram :as diagram]
-            ["@xyflow/react" :refer [ReactFlow Background Controls MiniMap Handle Position]]
+            ["@xyflow/react" :refer [ReactFlow Background Controls MiniMap Handle Position
+                                     applyNodeChanges applyEdgeChanges]]
             ["elkjs/lib/elk.bundled.js" :default ELK]))
 
 (def elk (ELK.))
@@ -166,7 +167,12 @@
        [:br] "nested boxes = if / fn body · ↺ dashed = recursion (trace)"]
       (when err [:pre {:style {:color "#b00" :padding "8px 12px" :margin 0 :fontSize 12}} err])]
      [:div {:style {:flex 1}}
-      [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15}
+      [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15
+                     ;; controlled state → apply drag/select changes so boxes are MOVABLE
+                     :onNodesChange (fn [changes]
+                                      (swap! state update :nodes #(applyNodeChanges changes %)))
+                     :onEdgesChange (fn [changes]
+                                      (swap! state update :edges #(applyEdgeChanges changes %)))}
        [:> Background]
        [:> Controls]
        [:> MiniMap {:pannable true :zoomable true}]]]]))
