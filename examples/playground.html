@@ -13,6 +13,15 @@
 </head>
 <body>
 <div id="app">loading…</div>
+<!-- mermaid is large + has a diagram-type graph shadow-cljs can't bundle, so we
+     load it from CDN here and hand it to the app via window.mermaid (the second
+     rendering functor; see katzen.playground/mermaid-view). -->
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose',
+                       flowchart: { htmlLabels: true, curve: 'basis' } });
+  window.mermaid = mermaid;
+</script>
 <script src="/dist/playground/playground.js"></script>
 </body>
 </html>

@@ -113,7 +113,8 @@
 ;; State + collapse-aware layout
 ;; ---------------------------------------------------------------------------
 
-(defonce state (r/atom {:code "" :rf nil :collapsed #{} :nodes #js [] :edges #js [] :err nil}))
+(defonce state (r/atom {:code "" :rf nil :dia nil :view :reactflow
+                        :collapsed #{} :nodes #js [] :edges #js [] :err nil}))
 
 (defn- ->elk
   "Build an ELK graph from the VISIBLE nodes. Collapsed groups appear as leaves
@@ -225,7 +226,7 @@
   (and (seq? form) (contains? '#{defn defn- fn fn*} (first form))))
 
 (defn render-diagram! [dia]
-  (swap! state assoc :rf (diagram/->reactflow dia) :collapsed #{})
+  (swap! state assoc :dia dia :rf (diagram/->reactflow dia) :collapsed #{})
   (layout!))
 
 (defn recompute! [code]
@@ -241,11 +242,67 @@
   (if diagram (render-diagram! diagram) (recompute! code)))
 
 ;; ---------------------------------------------------------------------------
+;; Mermaid view — the SECOND rendering functor off the same diagram value.
+;; Conventional flowchart (auto-layout, read-only), and — unlike ReactFlow —
+;; the source string embeds directly in markdown (GitHub/Notion render it).
+;; ---------------------------------------------------------------------------
+
+;; mermaid is large and pulls a diagram-type graph shadow-cljs can't bundle, so
+;; it's loaded from CDN by a <script type=module> in the HTML, which sets
+;; window.mermaid (already initialized). We just wait for it to appear.
+(defn- load-mermaid!
+  "Promise resolving to the mermaid object once the CDN module has loaded."
+  []
+  (js/Promise.
+   (fn [resolve reject]
+     (letfn [(check [n]
+               (if-let [m (.-mermaid js/window)]
+                 (resolve m)
+                 (if (> n 120)
+                   (reject (js/Error. "mermaid failed to load from CDN"))
+                   (js/setTimeout #(check (inc n)) 50))))]
+       (check 0)))))
+
+(defn- mermaid-view
+  "Renders `code` (a mermaid flowchart string) to SVG. Re-renders on prop change."
+  [_code]
+  (let [svg     (r/atom "")
+        last    (atom ::none)          ; guard: render only when the code changes
+        render! (fn [c]
+                  (when (not= c @last)
+                    (reset! last c)
+                    (-> (load-mermaid!)
+                        (.then  (fn [m] (.render m (str "m" (js/Math.abs (hash c))) c)))
+                        (.then  (fn [res] (reset! svg (.-svg res))))
+                        (.catch (fn [e] (reset! svg (str "<pre style='color:#b00;padding:12px'>"
+                                                         (.-message e) "</pre>")))))))]
+    (r/create-class
+     {:display-name         "mermaid-view"
+      :component-did-mount   (fn [this] (render! (nth (r/argv this) 1)))
+      :component-did-update  (fn [this _] (render! (nth (r/argv this) 1)))
+      :reagent-render
+      (fn [_code]
+        [:div {:style {:width "100%" :height "100%" :overflow "auto"
+                       :padding 16 :boxSizing "border-box" :textAlign "center"}
+               :dangerouslySetInnerHTML #js {:__html @svg}}])})))
+
+(defn- copy! [s]
+  (-> (.. js/navigator -clipboard (writeText s)) (.catch (fn [_] nil))))
+
+;; ---------------------------------------------------------------------------
 ;; UI
 ;; ---------------------------------------------------------------------------
 
+(defn- view-tab [view label active?]
+  [:button {:on-click #(swap! state assoc :view view)
+            :style {:fontFamily "inherit" :fontSize 11 :padding "3px 10px" :cursor "pointer"
+                    :border "1px solid #cbd5e1" :borderRadius 5
+                    :background (if active? "#0f172a" "#fff") :color (if active? "#fff" "#334155")}}
+   label])
+
 (defn app []
-  (let [{:keys [code nodes edges err]} @state]
+  (let [{:keys [code nodes edges err view dia]} @state
+        mcode (when dia (diagram/->mermaid dia))]
     [:div {:style {:display "flex" :height "100vh" :fontFamily "monospace"}}
      [:div {:style {:width "36%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
       [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8"
@@ -267,15 +324,29 @@
             :target "_blank" :rel "noopener" :style {:color "#6366f1"}}
         "Pavlović, Programs as Diagrams (Springer 2023)"]]
       (when err [:pre {:style {:color "#b00" :padding "8px 12px" :margin 0 :fontSize 12}} err])]
-     [:div {:style {:flex 1}}
-      [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15
-                     :onNodesChange (fn [changes]
-                                      (swap! state update :nodes #(applyNodeChanges changes %)))
-                     :onEdgesChange (fn [changes]
-                                      (swap! state update :edges #(applyEdgeChanges changes %)))}
-       [:> Background]
-       [:> Controls]
-       [:> MiniMap {:pannable true :zoomable true}]]]]))
+     [:div {:style {:flex 1 :display "flex" :flexDirection "column"}}
+      [:div {:style {:padding "6px 12px" :borderBottom "1px solid #e1e4e8" :background "#fafbfc"
+                     :display "flex" :alignItems "center" :gap 6}}
+       [view-tab :reactflow "◆ string diagram" (= view :reactflow)]
+       [view-tab :mermaid "▤ mermaid" (= view :mermaid)]
+       [:span {:style {:flex 1}}]
+       (when (= view :mermaid)
+         [:button {:on-click #(copy! mcode) :title "copy mermaid source (paste into any markdown)"
+                   :style {:fontFamily "inherit" :fontSize 11 :padding "3px 10px" :cursor "pointer"
+                           :border "1px solid #cbd5e1" :borderRadius 5 :background "#fff" :color "#334155"}}
+          "⧉ copy source"])]
+      [:div {:style {:flex 1 :minHeight 0}}
+       (if (= view :mermaid)
+         (if mcode ^{:key mcode} [mermaid-view mcode]
+             [:div {:style {:padding 16 :color "#586069"}} "No diagram."])
+         [:> ReactFlow {:nodes nodes :edges edges :nodeTypes node-types :fitView true :minZoom 0.15
+                        :onNodesChange (fn [changes]
+                                         (swap! state update :nodes #(applyNodeChanges changes %)))
+                        :onEdgesChange (fn [changes]
+                                         (swap! state update :edges #(applyEdgeChanges changes %)))}
+          [:> Background]
+          [:> Controls]
+          [:> MiniMap {:pannable true :zoomable true}]])]]]))
 
 (defn init! []
   (recompute! default-code)
