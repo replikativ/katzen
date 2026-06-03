@@ -1,0 +1,97 @@
+name: Render Clay Notebooks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dev/notebooks/**'
+      - 'src/**'
+      - 'deps.edn'
+      - '.github/workflows/clay-notebooks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  render-notebooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 24
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '24'
+
+      - name: Install Clojure CLI
+        uses: DeLaGuardo/setup-clojure@12.5
+        with:
+          cli: 1.12.0.1488
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.gitlibs
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/deps.edn') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Download Clojure dependencies
+        run: clojure -P -M:dev
+
+      - name: Render Clay notebooks
+        run: |
+          clojure -M:dev -e "
+          (require '[scicloj.clay.v2.api :as clay])
+
+          (def notebooks
+            [\"dev/notebooks/comparison_with_catlab.clj\"
+             \"dev/notebooks/migration_demo.clj\"])
+
+          (doseq [nb notebooks]
+            (println \"Rendering\" nb)
+            (clay/make! {:source-path nb
+                         :base-target-path \"_site\"
+                         :show false}))
+
+          (spit \"_site/index.html\"
+                \"<html><head><style>
+                   body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+                   h1 { margin-bottom: 0.3em; }
+                   ul { line-height: 2; }
+                   a { color: #1a6; }
+                 </style></head><body>
+                 <h1>Katzen Notebooks</h1>
+                 <p>Walkthroughs rendered from <a href='https://github.com/replikativ/katzen'>source</a>.</p>
+                 <ul>
+                   <li><a href='notebooks.comparison_with_catlab.html'>Comparison with Catlab</a> — side-by-side with the Julia stack</li>
+                   <li><a href='notebooks.migration_demo.html'>Schema-driven migration</a> — Δ-migration walkthrough</li>
+                 </ul></body></html>\")
+
+          (println \"Done.\")
+          (System/exit 0)
+          "
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

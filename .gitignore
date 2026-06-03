@@ -1,0 +1,45 @@
+# Clojure
+/target
+/classes
+/checkouts
+/.cpcache
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+/.nrepl-history
+.hgignore
+.hg/
+
+# REPL
+/.nrepl-port
+.nrepl-history
+
+# Maven
+pom.xml
+pom.xml.asc
+
+# Build artifacts
+/out
+/resources/public/js
+
+# IDEs
+/.idea
+/*.iml
+/.vscode
+/.calva
+/.clj-kondo/.cache
+
+# MacOS
+.DS_Store
+
+# Misc
+/.rebel_readline_history
+
+# Generated notebook outputs (rebuilt by `clojure -M:dev -m notebooks.migration-demo`)
+/dev/notebooks/output/
+
+# Local internal notes: design analyses, sprint snapshots, historical
+# write-ups. Not part of the project's external surface; kept locally for
+# context but not tracked.
+/.internal/

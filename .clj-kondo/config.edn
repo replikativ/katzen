@@ -1,0 +1,19 @@
+;; clj-kondo config.
+;;
+;; The katzen.theory/deftheory macro introduces bindings for type/term
+;; names that clj-kondo can't see through statically. Treating it as
+;; `def` silences the unresolved-symbol storm at the cost of not
+;; tracking the introduced names — acceptable trade-off given the body
+;; is mostly declarative.
+;;
+;; katzen.morphism/defmorphism and katzen.acset/defacset-style macros
+;; would deserve the same hook if they grow.
+
+{:lint-as {katzen.theory/deftheory clojure.core/def
+           katzen.morphism/defmorphism clojure.core/def}
+
+ ;; Most "unused binding" warnings are descriptive destructure keys
+ ;; kept for self-documentation. We could underscore-prefix them all
+ ;; but that hurts readability. Globally relax that warning level.
+ :linters
+ {:unused-binding {:level :warning :exclude-destructured-keys-in-fn-args true}}}

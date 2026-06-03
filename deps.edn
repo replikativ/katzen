@@ -1,0 +1,133 @@
+{:paths ["src" "resources"]
+
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}}
+
+ :aliases
+ {;; ====================================================================
+  ;; Tests + CI
+  ;; ====================================================================
+
+  :test {:extra-paths ["test"]
+         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                      io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+
+  ;; CI alias (same as :test, for workflow clarity).
+  :ci {:extra-paths ["test"]
+       :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                    io.github.cognitect-labs/test-runner
+                    {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+       :main-opts ["-m" "cognitect.test-runner"]}
+
+  :dev {:extra-paths ["dev"]
+        :extra-deps {org.clojure/tools.namespace {:mvn/version "1.5.0"}
+                     org.scicloj/kindly {:mvn/version "4-beta23"}
+                     org.scicloj/clay {:mvn/version "2.0.13"}}}
+
+  :repl {:extra-paths ["test" "dev"]
+         :extra-deps {nrepl/nrepl {:mvn/version "1.3.0"}
+                      cider/cider-nrepl {:mvn/version "0.50.2"}}
+         :main-opts ["-m" "nrepl.cmdline"
+                     "--middleware" "[cider.nrepl/cider-middleware]"]}
+
+  ;; ====================================================================
+  ;; Optional backends — Clojars releases
+  ;; ====================================================================
+  ;;
+  ;; Each alias unlocks a capability. The base paths stay zero-dep without
+  ;; any optional alias active. See README.md "Optional aliases" for what
+  ;; each one enables.
+
+  ;; Lean-kernel-backed verification of GAT wellformedness and morphism
+  ;; axiom preservation. Requires a pre-built Mathlib store at
+  ;; /var/tmp/ansatz-mathlib (see ../ansatz README for setup).
+  :ansatz {:extra-paths ["dev"]
+           :extra-deps {org.replikativ/ansatz {:mvn/version "0.1.22"}}
+           :jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+
+  :test-ansatz {:extra-paths ["test" "test-ansatz" "dev"]
+                :extra-deps {org.replikativ/ansatz {:mvn/version "0.1.22"}
+                             org.clojure/test.check {:mvn/version "1.1.1"}
+                             io.github.cognitect-labs/test-runner
+                             {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                :jvm-opts ["--enable-native-access=ALL-UNNAMED"]
+                :main-opts ["-m" "cognitect.test-runner" "-d" "test-ansatz"]
+                :exec-fn cognitect.test-runner.api/test
+                :exec-args {:dirs ["test-ansatz"]}}
+
+  ;; Datalog-queryable persistent ACSet backend.
+  :datahike {:extra-deps {org.replikativ/datahike {:mvn/version "0.8.1697"}}}
+
+  :test-datahike {:extra-paths ["test" "test-datahike"]
+                  :extra-deps {org.replikativ/datahike {:mvn/version "0.8.1697"}
+                               io.github.cognitect-labs/test-runner
+                               {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                  :main-opts ["-m" "cognitect.test-runner" "-d" "test-datahike"]
+                  :exec-fn cognitect.test-runner.api/test
+                  :exec-args {:dirs ["test-datahike"]}}
+
+  :bench {:extra-paths ["dev"]
+          :extra-deps {org.replikativ/datahike {:mvn/version "0.8.1697"}
+                       criterium/criterium {:mvn/version "0.4.6"}}}
+
+  ;; Typed numerical compile path — `compile-rhs` returns a typed
+  ;; IFn__doubles_doubles_double consumable by `raster.ode/solve`.
+  ;;
+  ;; pangloss/pattern is a transitive dep raster needs but can't carry
+  ;; in its mvn pom (it's a git/sha). Re-add here.
+  :raster {:extra-deps {org.replikativ/raster {:mvn/version "0.1.2"}
+                        pangloss/pattern
+                        {:git/url "https://github.com/replikativ/pattern"
+                         :git/sha "7db8472e8c166c8a95705bf4f9ac9b12810766be"}
+                        org.typedclojure/typed.clj.checker
+                        {:git/url "https://github.com/whilo/typedclojure"
+                         :git/sha "5c6412026dea6a7cd24e1eb4f1b3408b350f7f4f"
+                         :deps/root "typed/clj.checker"}}
+           :jvm-opts ["--enable-native-access=ALL-UNNAMED"
+                      "--add-modules=jdk.incubator.vector"]}
+
+  :test-raster {:extra-paths ["test" "test-raster"]
+                :extra-deps {org.replikativ/raster {:mvn/version "0.1.2"}
+                             pangloss/pattern
+                             {:git/url "https://github.com/replikativ/pattern"
+                              :git/sha "7db8472e8c166c8a95705bf4f9ac9b12810766be"}
+                             org.typedclojure/typed.clj.checker
+                             {:git/url "https://github.com/whilo/typedclojure"
+                              :git/sha "5c6412026dea6a7cd24e1eb4f1b3408b350f7f4f"
+                              :deps/root "typed/clj.checker"}
+                             io.github.cognitect-labs/test-runner
+                             {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                :jvm-opts ["--enable-native-access=ALL-UNNAMED"
+                           "--add-modules=jdk.incubator.vector"
+                           "-Xss8m"
+                           "-XX:ReservedCodeCacheSize=512m"]
+                :main-opts ["-m" "cognitect.test-runner" "-d" "test-raster"]
+                :exec-fn cognitect.test-runner.api/test
+                :exec-args {:dirs ["test-raster"]}}
+
+  ;; ====================================================================
+  ;; Build, format, lint, deps-checking
+  ;; ====================================================================
+
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.6"}
+                 slipset/deps-deploy {:mvn/version "0.2.2"}
+                 io.github.borkdude/gh-release-artifact
+                 {:git/sha "b946558225a7839f6a0f644834e838e190dc2262"}
+                 babashka/babashka.curl {:mvn/version "0.1.2"}
+                 babashka/fs {:mvn/version "0.3.17"}
+                 cheshire/cheshire {:mvn/version "5.11.0"}}
+          :ns-default build}
+
+  :format {:extra-deps {cljfmt/cljfmt {:mvn/version "0.9.2"}}
+           :main-opts ["-m" "cljfmt.main" "check" "src" "test"]}
+
+  :ffix {:extra-deps {cljfmt/cljfmt {:mvn/version "0.9.2"}}
+         :main-opts ["-m" "cljfmt.main" "fix" "src" "test"]}
+
+  :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
+         :main-opts ["-m" "clj-kondo.main" "--lint" "src" "test"]}
+
+  :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.10.1241"}}
+             :main-opts ["-m" "antq.core"]}}}
