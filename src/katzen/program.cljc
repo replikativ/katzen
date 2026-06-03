@@ -234,7 +234,7 @@
   (cond
     (and (symbol? expr) (contains? (:env state) expr)) [state (get-in state [:env expr])]
     (seq? expr)   (walk-call state expr)
-    (symbol? expr)(add-box state {:label (str expr) :kind :program :pure? true :ins []})
+    (symbol? expr) (add-box state {:label (str expr) :kind :program :pure? true :ins []})
     :else         (add-box state {:label (pr-str expr) :pure? true :ins []})))
 
 (defn fn->diagram
@@ -262,7 +262,7 @@
                            inputs))
         ;; recursion targets = the param ports (a self-call / recur feeds back here)
         state (assoc state :fn-name (some-> fname str)
-                           :recur-targets (mapv :port inputs))
+                     :recur-targets (mapv :port inputs))
         [state out] (reduce (fn [[st _] e] (walk st e)) [state nil] body)]
     {:name (some-> fname str)
      :inputs inputs
