@@ -28,14 +28,27 @@
     :db/cardinality :db.cardinality/one
     :db/index       true}])
 
+(defn- db-cardinality
+  "Map a morphism's `:cardinality` (`:one` default, or `:many`) to datahike's
+   native cardinality. A `:many` morphism is a RELATION (not a function): it
+   uses datahike's native `:db.cardinality/many` rather than a junction object —
+   katzen as a lens over what datahike already does. Reified relations (with
+   their own attributes) stay modeled as their own object."
+  [m]
+  (case (:cardinality m :one)
+    :many :db.cardinality/many
+    :db.cardinality/one))
+
 (defn- hom->schema-tx
-  "Datahike schema attribute for a Hom morphism. We make it indexed for
-   incident lookups."
-  [{:keys [name]}]
-  {:db/ident       name
-   :db/valueType   :db.type/ref
-   :db/cardinality :db.cardinality/one
-   :db/index       true})
+  "Datahike schema attribute for a Hom morphism. Indexed for incident lookups;
+   honours `:cardinality` (:one/:many) and an optional `:unique`
+   (:db.unique/identity | :db.unique/value)."
+  [{:keys [name unique] :as h}]
+  (cond-> {:db/ident       name
+           :db/valueType   :db.type/ref
+           :db/cardinality (db-cardinality h)
+           :db/index       true}
+    unique (assoc :db/unique unique)))
 
 (def ^:private attr-type->value-type
   "Map an ACSet attr-type name to a datahike :db/valueType. Covers the common
@@ -59,11 +72,17 @@
   "Datahike schema attribute for an Attr morphism (a typed value column).
    Unlike a Hom (a ref), the value type comes from the attr's codom (an
    attr-type), so values like strings/ints/uuids are stored directly."
-  [{:keys [name codom]}]
-  {:db/ident       name
-   :db/valueType   (get attr-type->value-type codom :db.type/string)
-   :db/cardinality :db.cardinality/one
-   :db/index       true})
+  [{:keys [name codom unique] :as a}]
+  (cond-> {:db/ident       name
+           :db/valueType   (get attr-type->value-type codom :db.type/string)
+           :db/cardinality (db-cardinality a)
+           :db/index       true}
+    unique (assoc :db/unique unique)))
+
+(defn- many?
+  "True if morphism `mname` is declared `:cardinality :many` in `schema-data`."
+  [schema-data mname]
+  (= :many (:cardinality (second (a/morphism-by-name schema-data mname)))))
 
 (defn- schema->datahike-tx
   "Build the initial-tx for create-database from an ACSet schema: the object
@@ -100,14 +119,16 @@
                (d/db conn) ob))))
 
   (-subpart [_ mname part-id]
-    (ffirst
-     (d/q '[:find ?v :in $ ?e ?m :where [?e ?m ?v]]
-          (d/db conn) part-id mname)))
+    (let [vs (map first (d/q '[:find ?v :in $ ?e ?m :where [?e ?m ?v]]
+                             (d/db conn) part-id mname))]
+      (if (many? schema-data mname) (set vs) (first vs))))
 
   (-subpart-all [_ mname]
-    (into {}
-          (d/q '[:find ?e ?v :in $ ?m :where [?e ?m ?v]]
-               (d/db conn) mname)))
+    (let [rows (d/q '[:find ?e ?v :in $ ?m :where [?e ?m ?v]]
+                    (d/db conn) mname)]
+      (if (many? schema-data mname)
+        (reduce (fn [acc [e v]] (update acc e (fnil conj #{}) v)) {} rows)
+        (into {} rows))))
 
   (-incident [_ mname value]
     (sort
@@ -126,7 +147,15 @@
       [self new-ids]))
 
   (-set-subpart [self mname part-id value]
-    (d/transact conn {:tx-data [[:db/add part-id mname value]]})
+    ;; For a :many morphism, `value` is a COLLECTION and we REPLACE the current
+    ;; set (retract existing, add each) — datahike-native many, no junction. For
+    ;; :one, set the single value.
+    (if (many? schema-data mname)
+      (let [existing (map first (d/q '[:find ?v :in $ ?e ?m :where [?e ?m ?v]]
+                                     (d/db conn) part-id mname))]
+        (d/transact conn {:tx-data (into (mapv (fn [v] [:db/retract part-id mname v]) existing)
+                                         (mapv (fn [v] [:db/add part-id mname v]) value))}))
+      (d/transact conn {:tx-data [[:db/add part-id mname value]]}))
     self)
 
   (-rem-part [self ob part-id]

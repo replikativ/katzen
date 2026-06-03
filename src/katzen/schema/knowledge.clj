@@ -6,12 +6,14 @@
 
    Categorical shape:
      - Object `Entity` — a knowledge entity (the [[wiki-link]] node).
-     - Object `Link`   — a junction reifying the cardinality-MANY entity↔entity
-       links as a span `Entity ← Link → Entity` (ACSet homs are functions, so a
-       many-relation is its own object with two homs — the faithful modeling).
      - Hom `employer` — the cardinality-ONE person→company edge (Entity→Entity).
-     - Attr `title` : Entity → Identity — the entity name AS A URI, the shared
-       cross-ACSet join key (see `katzen.xref`).
+     - Hom `links` — the cardinality-MANY entity↔entity links, as a NATIVE
+       datahike cardinality-many ref (not a junction object). A plain
+       many-relation maps onto what datahike already does; a junction object is
+       reserved for a REIFIED relation (one carrying its own attributes — e.g. a
+       Membership with a `since` date), which is just another Object.
+     - Attr `title` : Entity → Identity (unique) — the entity name AS A URI, the
+       shared cross-ACSet join key (see `katzen.xref`).
      - The remaining attrs are the typed property columns.
 
    Names are ABSTRACT (no store idents). dvergr binds them to its `:entity/*`
@@ -21,12 +23,11 @@
 (def schema
   "Canonical knowledge-base ACSet schema (abstract names)."
   {:name :Knowledge
-   :objects   [:Entity :Link]
+   :objects   [:Entity]
    :homs      [{:name :employer :dom :Entity :codom :Entity}
-               {:name :link-src :dom :Link   :codom :Entity}
-               {:name :link-dst :dom :Link   :codom :Entity}]
+               {:name :links    :dom :Entity :codom :Entity :cardinality :many}]
    :attr-types [:Identity :String :Keyword :Long :Instant]
-   :attrs     [{:name :title         :dom :Entity :codom :Identity}
+   :attrs     [{:name :title         :dom :Entity :codom :Identity :unique :db.unique/value}
                {:name :summary       :dom :Entity :codom :String}
                {:name :kind          :dom :Entity :codom :Keyword}
                {:name :url           :dom :Entity :codom :String}

@@ -6,25 +6,25 @@
 
    Categorical shape:
      - Object `Def` — a top-level definition.
-     - Object `Ref` — a junction reifying the cardinality-MANY references a def
-       makes: `Def ← Ref → Identity`.
-     - Hom `from` : Ref → Def — which def makes the reference.
      - Attr `qname` : Def → Identity — the def's URI (the shared join key).
-     - Attr `to` : Ref → Identity — the referenced qname URI (resolving which
-       refs land on a project Def is a pullback over Identity — `katzen.xref`).
+     - Attr `refs` : Def → Identity (cardinality MANY) — the qname URIs this def
+       references, as a NATIVE datahike cardinality-many column (not a junction
+       object — the references carry no data of their own). Resolving which refs
+       land on a project Def is a pullback over Identity (`katzen.xref`);
+       find-references is `incident :refs`.
 
-   Names are ABSTRACT. dvergr binds them to its `:def/*` / `:ref/*` idents.")
+   Names are ABSTRACT. dvergr binds them to its `:def/*` idents.")
 
 (def schema
   "Canonical Clojure-code ACSet schema (abstract names)."
   {:name :ClojureCode
-   :objects   [:Def :Ref]
-   :homs      [{:name :from :dom :Ref :codom :Def}]
+   :objects   [:Def]
+   :homs      []
    :attr-types [:Identity :String]
    :attrs     [{:name :qname  :dom :Def :codom :Identity}
                {:name :file   :dom :Def :codom :String}
                {:name :source :dom :Def :codom :String}
-               {:name :to     :dom :Ref :codom :Identity}]
+               {:name :refs   :dom :Def :codom :Identity :cardinality :many}]
    :equations []})
 
 (def identity-attr

@@ -13,18 +13,20 @@
       (let [ac (a/vector-acset s)]
         (doseq [o (:objects s)] (is (= 0 (a/nparts ac o))))))))
 
-(deftest knowledge-schema-models-relations-as-junctions
-  (testing "the many-valued entity↔entity link is a Link junction (span)"
-    (is (some #(= :Link (:dom %)) (:homs kb/schema)))
-    (is (= #{:link-src :link-dst}
-           (set (map :name (filter #(= :Link (:dom %)) (:homs kb/schema))))))
-    (is (= :Identity (:codom (a/attr-by-name kb/schema kb/identity-attr))))))
+(deftest knowledge-schema-uses-native-cardinality-many
+  (testing "entity↔entity links are a native :cardinality :many hom (no junction)"
+    (let [links (a/hom-by-name kb/schema :links)]
+      (is (= :many (:cardinality links)))
+      (is (= :Entity (:dom links))) (is (= :Entity (:codom links))))
+    (is (not (some #{:Link} (:objects kb/schema))) "no Link junction object")
+    (is (= :Identity (:codom (a/attr-by-name kb/schema kb/identity-attr))))
+    (is (= :db.unique/value (:unique (a/attr-by-name kb/schema :title))) "title is unique")))
 
 (deftest rename-binds-abstract-names-to-store-idents
   (testing "rename-schema renames objects, attr-types, morphisms, dom/codom"
     (let [bound (a/rename-schema kb/schema
                   {:title :entity/title :employer :entity/employer
-                   :link-src :link/src :link-dst :link/dst :kind :entity/type})]
+                   :links :entity/links :kind :entity/type})]
       (is (a/schema-map? bound))
       (is (= :entity/title (:name (a/attr-by-name bound :entity/title))))
       (is (nil? (a/attr-by-name bound :title)) "old name gone")
@@ -40,8 +42,10 @@
           inv (clojure.set/map-invert m)]
       (is (= kb/schema (a/rename-schema (a/rename-schema kb/schema m) inv))))))
 
-(deftest code-schema-promotes-the-dvergr-index-shape
-  (testing "Def keyed by qname Identity + a Ref junction"
+(deftest code-schema-uses-native-many-refs
+  (testing "Def keyed by qname Identity + a :cardinality :many refs attr (no Ref junction)"
     (is (= :Identity (:codom (a/attr-by-name code/schema :qname))))
-    (is (= {:name :from :dom :Ref :codom :Def} (a/hom-by-name code/schema :from)))
-    (is (= :Identity (:codom (a/attr-by-name code/schema :to))))))
+    (is (not (some #{:Ref} (:objects code/schema))) "no Ref junction object")
+    (let [refs (a/attr-by-name code/schema :refs)]
+      (is (= :many (:cardinality refs)))
+      (is (= :Identity (:codom refs))))))

@@ -7,7 +7,16 @@
 
    A monoid is `{:empty e :combine f}` with `f` associative+commutative and `e`
    its unit. A rollup folds the values reachable from a part — typically the
-   inverse image of a junction hom (a fan-in) — into one aggregate."
+   inverse image of a cardinality-many morphism (a fan-in) — into one aggregate.
+
+   SCOPE / DELEGATION. This namespace is the categorical *specification* of a
+   rollup (the monoid) plus a small in-memory *reference* fold for modest ACSets.
+   It is deliberately NOT an aggregation engine: at scale, `GROUP BY … SUM/COUNT/
+   …` is exactly what `../stratum` (columnar, SIMD, branchable) and datahike
+   datalog already do well. The intended production path LOWERS a rollup spec to
+   stratum or datalog rather than running this fold — katzen as a lens over those
+   engines, not a reimplementation of them. (A `lower-to-stratum`/`lower-to-datalog`
+   seam is future work; the monoid here defines what those must compute.)"
   (:require [katzen.acset :as a]
             [katzen.eval :as ev]))
 
