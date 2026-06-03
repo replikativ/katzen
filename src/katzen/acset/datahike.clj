@@ -43,10 +43,10 @@
    unknown attr-types fall back to :db.type/string."
   {:String  :db.type/string  :Str    :db.type/string
    ;; Identity / URI: the cross-ACSet reference space (see katzen.xref). STRING-
-   ;; valued (e.g. "demo.core/a") — qualified names as URIs. NB: datahike
-   ;; value-bound queries do not discriminate :db.type/symbol values (a bound
-   ;; symbol matches every symbol), so identity MUST be a string to be a join
-   ;; key. See dvergr open-issues.
+   ;; valued (e.g. "demo.core/a") — qualified names as URIs. Strings are the
+   ;; portable identity space: language-agnostic, addressable, and unaffected by
+   ;; the released-datahike symbol-value query bug (fixed on the datahike branch
+   ;; fix/symbol-value-scalar-input, but strings work everywhere regardless).
    :Identity :db.type/string :URI    :db.type/string
    :Symbol  :db.type/symbol  :Keyword :db.type/keyword
    :Int     :db.type/long    :Integer :db.type/long   :Long :db.type/long
