@@ -63,7 +63,7 @@ functions call graph) to a wiring diagram.
 | binding used N× | **copy** `Δ` (fan-out, explicit) | comonoid (CD) |
 | binding used 0× | **delete** `▪` (ground, explicit) | comonoid (CD) |
 | **pure, total fn** | the **cartesian bead `•`** — licenses CSE/DCE | cartesian sub-cat |
-| `(if c t e)` | a **`cond` box** with a control port + the two branches as **nested sub-diagrams** | operadic box (semantics: `ifte = {c}(t,e)` via `run`) |
+| `(if c t e)` | a **`cond` box**: a control port + the two branches as **nested sub-diagrams** (= the branch program-codes) | **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = {{c}(⌜t⌝, ⌜e⌝)}` — select a program code via `{c}`, then `run` it; only one branch runs (Pavlović §3.6.1, Eq 3.31). A well-defined `if` wants a **decidable** (pure/total = beaded) predicate (§2.4.1). |
 | `(fn …)` / HOF (`map`, `comp`) | an element of the **program object `P`** + a **`run`/apply box** | monoidal computer |
 | `loop`/`recur`, self-recursion | a **trace feedback loop** (rendering) | semantics: Kleene **fixpoint** (`run`+copy) |
 | atoms / channels / shared state | a **junction** (shared resource) | hypergraph / UWD |
@@ -74,10 +74,18 @@ are understood as the classical counterparts, to revisit):
 - **Higher-order = `run`/`P`**, not an internal hom. Honest for a language with
   `eval`/macros.
 - **Recursion = a fixpoint**, *rendered* as a trace loop (see §4).
-- **Conditionals = an operadic `cond` box** whose branches are sub-diagrams;
-  semantically `ifte` on a Boolean program. (This is the categorical reason
-  Catlab's straight-line `@program` can't do `if`: branching is not a monoidal
-  primitive — it needs `run`/coproduct/distributivity. We pick `run`.)
+- **Conditionals = Pavlović's lazy branching** (§3.6.1, Eq 3.31):
+  `ift(c, F, G) = {{c}(F, G)}` — the branches are **program codes** `F = ⌜then⌝`,
+  `G = ⌜else⌝`; `{c}` selects one code; the outer `run` evaluates it; **only one
+  branch runs**. We render the two codes as nested sub-diagrams and the selection
+  as a `cond` box (a *view* of this morphism — see §4). This is purely the
+  monoidal computer: no operad, no coproduct, no CCC. (It is the categorical
+  reason Catlab's straight-line `@program` can't do `if`: branching is not a
+  monoidal primitive — it needs `run` (Pavlović), or coproducts/distributivity
+  (the classical route Pavlović names in §1.7.3 and deliberately sets aside). The
+  branches *being programs* is the whole "programs are data" thesis. NB: the
+  earlier "operadic" framing was wrong — `oapply` is *static* composition of
+  whole diagrams, not runtime branch selection.)
 
 ## 4. Semantics vs rendering — the anti-frankenstein rule
 
@@ -117,12 +125,15 @@ load-bearing — they're all serializations of one ACSet.
    params/let/calls/copy/delete + the purity bead — and **render to mermaid**.
    Demo: a real pure Clojure fn shown as a diagram with shared/dropped wires and
    beads, noting the *same* diagram type carries the SIR/control composites.
-3. **`cond` box** (operadic, nested branches) — *done*: `if`/`when`/`cond`
+3. **`cond` box** (lazy branching, nested branches) — *done*: `if`/`when`/`cond`
    become a `:cond` box (a hexagon) whose two branches are walked into grouped
-   sub-diagrams and rendered as nested subgraphs; the condition + both branch
-   outputs wire into the box (selection); shared in-scope values flow into both
-   branches. Semantics = `run(ifte(c, ⌜then⌝, ⌜else⌝), …)` (Dusko, no coproducts);
-   the operadic nesting is Catlab's box-filled-by-a-sub-diagram (`oapply`).
+   sub-diagrams (the branch program-codes) and rendered as nested subgraphs; the
+   condition + both branch outputs wire into the box (the selection); shared
+   in-scope values flow into both branches. Semantics = Pavlović's lazy
+   `ift(c, ⌜then⌝, ⌜else⌝) = {{c}(⌜then⌝, ⌜else⌝)}` (§3.6.1, Eq 3.31) — select a
+   code, then `run` it; only one branch runs. Pure monoidal computer — no operad,
+   no coproduct. (The nested-branch *drawing* is the view; that both are drawn
+   exposes structure, that one runs is the semantics.)
 4. **HOF** via `run`/`P` box.
 5. **Recursion** as a trace-rendered fixpoint.
 6. **Monoidal-operations layer** in katzen (SMC/cartesian/traced theories +

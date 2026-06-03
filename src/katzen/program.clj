@@ -113,10 +113,13 @@
       [(reduce (fn [st p] (wire st p out)) state in-ports) out])))
 
 (defn- walk-cond
-  "An `(if c t e)`: a `:cond` box (semantics `run(ifte(c, ⌜then⌝, ⌜else⌝), …)` —
-   Dusko) whose two branches are walked into grouped sub-diagrams (the operadic
-   fill). The condition wires in as control; each branch's result wires to the
-   box's output (selection — only one runs at runtime)."
+  "An `(if c t e)`: a `:cond` box implementing Pavlović's LAZY branching (§3.6.1,
+   Eq 3.31) `ift(c, ⌜then⌝, ⌜else⌝) = {{c}(⌜then⌝, ⌜else⌝)}` — `{c}` selects a
+   branch *program code*, the outer `run` evaluates it; only one branch runs. The
+   two branches are walked into grouped sub-diagrams (they ARE the program codes
+   F/G). The condition wires in as control; each branch's result wires to the
+   box's output (the selection). Pure monoidal computer — no operad, no
+   coproduct; the branches being programs is the 'programs are data' thesis."
   [state c t e]
   (let [[state ctrl]          (walk state c)
         parent                (:group state [])
