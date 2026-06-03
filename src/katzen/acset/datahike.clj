@@ -162,7 +162,21 @@
   ([schema-data conn]
    (when-not (a/schema-map? schema-data)
      (throw (ex-info "datahike-acset expects a schema map" {:got schema-data})))
-   (d/transact conn {:tx-data (schema->datahike-tx schema-data)})
+   ;; Install only the idents this conn does NOT already have. Hosting an ACSet
+   ;; inside an existing app DB, the schema's columns (e.g. :entity/title,
+   ;; :entity/employer) typically already exist — possibly with flags this
+   ;; backend wouldn't set (e.g. :db.unique/value) or WITHOUT ones it would
+   ;; (e.g. :db/index). Re-asserting them is at best a no-op and at worst a
+   ;; hard datahike error ("Update not supported for these schema attributes",
+   ;; e.g. adding :db/index to an existing attr). So we defer to whatever the
+   ;; existing schema says and only add the genuinely missing idents (commonly
+   ;; just the :katzen/ob object marker).
+   (let [existing (into #{} (map first)
+                        (d/q '[:find ?id :where [?e :db/ident ?id]] (d/db conn)))
+         tx (into [] (remove #(contains? existing (:db/ident %)))
+                  (schema->datahike-tx schema-data))]
+     (when (seq tx)
+       (d/transact conn {:tx-data tx})))
    (->DatahikeACSet schema-data conn)))
 
 ;; Convenience graph constructors mirroring katzen.acset's hand-written ones.
