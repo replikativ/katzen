@@ -64,6 +64,50 @@ data. (If you just want `Functor`/`Monad` protocols for FP plumbing, that's
 treatment, with knowledge / code / accounting worked side-by-side, is in
 [doc/schemata.md](doc/schemata.md).
 
+### Composing dynamical systems is tricky — here's the principled way
+
+Wiring subsystems together by hand goes wrong in subtle ways: shared variables
+get duplicated, feedback is ill-defined, and the result isn't reusable. katzen
+uses **operads of wiring diagrams** — a composition *pattern* says how parts
+connect, and `oapply` (an operad algebra, i.e. a functor) computes the
+composite, identifying shared variables correctly.
+
+An SIR epidemic is the composite of two reaction networks that **share the
+infected population** `I` (the same move as Lotka–Volterra sharing its prey):
+
+```clojure
+(require '[katzen.petri :as p] '[katzen.uwd :as uwd]
+         '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
+
+;; two primitive reaction networks
+(defn infection [] ; S + I -> 2I   (species 1=S, 2=I)
+  (let [n (p/petri) [n _](p/add-species n) [n _](p/add-species n) [n t](p/add-transition n)
+        [n _](p/add-input n 1 t) [n _](p/add-input n 2 t)
+        [n _](p/add-output n 2 t) [n _](p/add-output n 2 t)] n))
+(defn recovery  [] ; I -> R        (species 1=I, 2=R)
+  (let [n (p/petri) [n _](p/add-species n) [n _](p/add-species n) [n t](p/add-transition n)
+        [n _](p/add-input n 1 t) [n _](p/add-output n 2 t)] n))
+
+;; composition pattern: 3 junctions S,I,R; infection exposes [S I], recovery exposes [I R]
+(let [d (uwd/uwd) [d js] (uwd/add-junctions d 3)
+      [d B1 _] (uwd/add-box-with-ports d (take 2 js))
+      [d B2 _] (uwd/add-box-with-ports d (drop 1 js))
+      ;; oapply identifies the shared I, sums the dynamics → one composite system
+      sir (ud/oapply d {B1 (ud/from-compilable (p/petri-dynamics (infection) {1 (/ 0.3 1000.0)}) [1 2])
+                        B2 (ud/from-compilable (p/petri-dynamics (recovery)  {1 0.1})           [1 2])})
+      rhs (cc/compile-clojure-rhs sir)]
+  (cc/layout-of sir)                                    ; => 3 state classes: S, I, R (I merged, not duplicated)
+  (last (:us (p/integrate-rk4 rhs [999.0 1.0 0.0] 0.0 100.0 0.5))))
+;; => [60 4 936]   the classic epidemic curve, integrated from the composite
+```
+
+The composite is straight-line code (no diagram re-walk per step); add the
+`:raster` alias to compile it to native numerics and solve with `Tsit5`.
+Directed composition (input/output **machines** with readouts) and **open Petri
+nets → ODE** as a functor work the same way. See
+[doc/composition.md](doc/composition.md) for the full story (and why naive
+composition fails).
+
 ## Define a category
 
 A *generalized algebraic theory* (GAT) is the data shape Katzen uses
