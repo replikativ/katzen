@@ -48,6 +48,36 @@ are).
   `ContinuousResourceSharer`. The algebra is `Dynam`
   ([Baez–Pollard 2017](https://arxiv.org/abs/1704.02051)). This is the SIR/
   Lotka–Volterra "identify the shared population" case — see the README example.
+
+### What a box's dynamics can be
+
+A box in a UWD just needs a vector field over its states. katzen gives three
+sources, all `katzen.compile.core/RasterCompilable`, all composed by the same
+`oapply`:
+
+- **`katzen.petri/petri-dynamics`** — mass-action from a reaction network. The
+  net *is* the model; rates are the only free numbers. Great when the system is
+  genuinely a set of reactions (SIR, enzyme kinetics, chemical networks).
+- **`katzen.ode/vector-field`** — a *symbolic* field `{state expr …}` over the
+  states and named parameters. This is for systems that are **not** clean
+  mass-action nets — textbook **Lotka–Volterra** (independent birth/predation/
+  death rates) is the canonical example. It compiles to both the fast raster
+  body and a Clojure body, so it keeps full numerics *and* inlines under
+  composition. AlgebraicDynamics has no symbolic-field source — it always
+  carries closures; this is katzen doing strictly more.
+- **`katzen.ode/raw-field`** — an *opaque* Clojure closure `(fn [u t] → du)`
+  over the box's local states. This is the faithful analog of AlgebraicDynamics'
+  `ContinuousResourceSharer{T}(nstates, f)`: any dynamics whatsoever, composed
+  by gather→call→scatter (its `induced_dynamics` recipe). An opaque fn can't be
+  inlined into straight-line code, so a `raw-field` box has **no raster body** —
+  the composite runs on the Clojure path (`compile-clojure-rhs`).
+  AlgebraicDynamics has the same limitation (it re-walks closures every step).
+
+The split is the trade-off, made explicit: a *symbolic* field gets the fast
+raster path and is what you should reach for; an *opaque* closure buys you
+arbitrary Clojure at the cost of the inlined numerics. Both share variables and
+compose identically — the README shows Lotka–Volterra built as growth +
+predation + death over both.
 - **Directed (DWD / CPG) — machines.** Boxes have inputs, outputs, and a
   *readout* function; wires feed outputs to inputs. `katzen.dwd.dynamics/
   oapply-dwd` over a `Machine`. The algebras are `CDS`/`DDS`

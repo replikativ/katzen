@@ -103,6 +103,35 @@ infected population** `I` (the same move as Lotka–Volterra sharing its prey):
 
 The composite is straight-line code (no diagram re-walk per step); add the
 `:raster` alias to compile it to native numerics and solve with `Tsit5`.
+
+Not every system is a clean mass-action net — textbook **Lotka–Volterra** has
+independent birth/predation/death rates. For those, `katzen.ode/vector-field`
+gives you a system from a symbolic field (still compiles to the fast raster
+path), and `katzen.ode/raw-field` from an arbitrary Clojure closure (the
+faithful analog of AlgebraicDynamics' raw-function resource sharer). Both
+compose through the *same* `oapply` — predator–prey is growth + predation +
+death **sharing the prey and predator populations**:
+
+```clojure
+(require '[katzen.ode :as ode] '[katzen.uwd :as uwd] '[katzen.petri :as p]
+         '[katzen.uwd.dynamics :as ud] '[katzen.compile.core :as cc])
+
+(let [growth    (ode/vector-field {:states '[r]   :params '{a 1.1} :field '{r (* a r)}})
+      predation (ode/vector-field {:states '[r f] :params '{b 0.4 d 0.1}
+                                   :field  '{r (- (* b r f)) f (* d r f)}})
+      death     (ode/vector-field {:states '[f]   :params '{g 0.4} :field '{f (- (* g f))}})
+      d (uwd/uwd) [d [jR jF]] (uwd/add-junctions d 2)
+      [d Bg _] (uwd/add-box-with-ports d [jR])      ; growth touches the prey R
+      [d Bp _] (uwd/add-box-with-ports d [jR jF])   ; predation couples R and F
+      [d Bd _] (uwd/add-box-with-ports d [jF])      ; death touches the predator F
+      lv  (ud/oapply d {Bg (ud/from-compilable growth    '[r])
+                        Bp (ud/from-compilable predation '[r f])
+                        Bd (ud/from-compilable death     '[f])})]
+  (cc/layout-of lv)   ; => 2 state classes: R, F (prey/predator merged across the 3 boxes)
+  (last (:us (p/integrate-rk4 (cc/compile-clojure-rhs lv) [10.0 10.0] 0.0 20.0 0.001))))
+;; the composite conserves the LV first integral to ~1e-12 — a correct closed orbit
+```
+
 Directed composition (input/output **machines** with readouts) and **open Petri
 nets → ODE** as a functor work the same way. See
 [doc/composition.md](doc/composition.md) for the full story (and why naive
@@ -286,6 +315,7 @@ clojure -M:dev:raster:ansatz -m notebooks.comparison-with-catlab
 | UWD composition | `katzen.uwd.dynamics` `uwd`, `oapply` | [AlgebraicDynamics.jl `uwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
 | DWD composition | `katzen.dwd.dynamics` `dwd`, `oapply-dwd`, `machine` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
 | Circular port graphs | `katzen.cpg` | [AlgebraicDynamics.jl `cpg_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/cpg_dynam.jl) |
+| Vector fields (non-net dynamics) | `katzen.ode` `vector-field` (symbolic), `raw-field` (closure) | [AlgebraicDynamics.jl `ContinuousResourceSharer`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
 | Petri nets | `katzen.petri` `petri`, `petri-dynamics`, `integrate-rk4`, `migrate-dynamics` | [AlgebraicPetri.jl](https://github.com/AlgebraicJulia/AlgebraicPetri.jl) |
 | Reaction networks | `katzen.reaction` `reaction-network`, `reaction-dynamics` (mass-action, Michaelis-Menten, Hill, `:expr`) | [Catalyst.jl](https://github.com/SciML/Catalyst.jl) |
 | Numerical compile | `katzen.compile.core` `RasterCompilable`, `compile-rhs`, `compile-clojure-rhs` | [AlgebraicPetri.jl `vectorfield_expr`](https://github.com/AlgebraicJulia/AlgebraicPetri.jl/blob/main/src/AlgebraicPetri.jl) (via `GeneralizedGenerated.mk_function`) |
