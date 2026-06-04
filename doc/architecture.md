@@ -141,6 +141,32 @@ by rewriting the domain on katzen.** A mature app keeps its implementation and
 gains the categorical operations (xref, equation-checking, rendering, migration)
 through a thin adapter.
 
+## 6. Catlab / GATlab equivalence map
+
+Coming from AlgebraicJulia? Each piece of the Julia stack has a katzen
+namespace. (Some have no Catlab/GATlab counterpart — instance axiom checking
+and Lean-kernel verification are katzen additions.)
+
+| Area | Namespace | Catlab/GATlab equivalent |
+|---|---|---|
+| Declare a theory | `katzen.theory` `deftheory`, `katzen.stdlib.core` | [GATlab.jl `@theory`](https://github.com/AlgebraicJulia/GATlab.jl/blob/main/src/syntax/gats/) |
+| ACSets | `katzen.acset` `vector-acset`, `add-parts`, `set-subpart` | [Catlab.jl `@acset_type`](https://github.com/AlgebraicJulia/Catlab.jl/tree/main/src/categorical_algebra) |
+| Schema morphisms + Δ-migration | `katzen.acset.migration` `schema-morphism`, `migrate`, `migrate-morphism` | [Catlab.jl `DeltaMigration`](https://github.com/AlgebraicJulia/Catlab.jl/blob/main/src/categorical_algebra/pointwise/FunctorialDataMigrations.jl) |
+| ACSet morphisms + naturality | `katzen.acset.morphism` `acset-morphism`, `natural?`, `compose` | [Catlab.jl `is_natural`](https://github.com/AlgebraicJulia/Catlab.jl/blob/main/src/categorical_algebra/pointwise/csets/CSets.jl) |
+| Homomorphism search | `katzen.acset.homomorphism` `homomorphisms`, `nhomomorphisms` | [Catlab.jl `homomorphisms`](https://github.com/AlgebraicJulia/Catlab.jl/blob/main/src/categorical_algebra/pointwise/_HomSearch.jl) |
+| Instance axiom enforcement | `katzen.acset.check` `check-axioms`, `check-axioms!` | none — Catlab leaves this to user code |
+| Symbolic normalization | `katzen.acset.normalize`, `katzen.symbolic.normalize` `normalize`, `equiv?` | [GATlab.jl `GATExprUtils`](https://github.com/AlgebraicJulia/GATlab.jl/blob/main/src/models/GATExprUtils.jl) |
+| Lean-kernel verification | `katzen.ansatz.export`, `katzen.acset.theory-bridge` `check-theory!`, `verify-schema-morphism!`, `verified-migrate` | none — GATlab's `TheoryMaps.jl:256` has an open TODO |
+| FinSet (co)limits | `katzen.finset.limits`, `katzen.finset.colimits` `product`, `pullback`, `coproduct`, `pushout` | [Catlab.jl `FinSet` limits](https://github.com/AlgebraicJulia/Catlab.jl/tree/main/src/categorical_algebra/setcats) |
+| Operadic composition (unified) | `katzen.compose` `oapply` — one entry over all operads × algebras | [Catlab/AlgebraicDynamics `oapply`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl) (multiple dispatch) |
+| UWD composition | `katzen.uwd.dynamics` `uwd`, `oapply` | [AlgebraicDynamics.jl `uwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
+| DWD composition (directed / control) | `katzen.dwd.dynamics` `oapply-dwd`, `raw-machine`, `vector-machine`, `eval-dynamics`, `signal-rhs` | [AlgebraicDynamics.jl `dwd_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/dwd_dynam.jl) |
+| Circular port graphs | `katzen.cpg` | [AlgebraicDynamics.jl `cpg_dynam.jl`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/cpg_dynam.jl) |
+| Vector fields (non-net dynamics) | `katzen.ode` `vector-field` (symbolic), `raw-field` (closure) | [AlgebraicDynamics.jl `ContinuousResourceSharer`](https://github.com/AlgebraicJulia/AlgebraicDynamics.jl/blob/main/src/uwd_dynam.jl) |
+| Petri nets | `katzen.petri` `petri`, `petri-dynamics`, `integrate-rk4`, `migrate-dynamics` | [AlgebraicPetri.jl](https://github.com/AlgebraicJulia/AlgebraicPetri.jl) |
+| Reaction networks | `katzen.reaction` `reaction-network`, `reaction-dynamics` (mass-action, Michaelis-Menten, Hill, `:expr`) | [Catalyst.jl](https://github.com/SciML/Catalyst.jl) |
+| Numerical compile | `katzen.compile.core` `RasterCompilable`, `compile-rhs`, `compile-clojure-rhs` | [AlgebraicPetri.jl `vectorfield_expr`](https://github.com/AlgebraicJulia/AlgebraicPetri.jl/blob/main/src/AlgebraicPetri.jl) (via `GeneralizedGenerated.mk_function`) |
+
 ## See also
 
 - [schemata.md](schemata.md) — schemas/ACSets, equations, type-side, aggregation,
