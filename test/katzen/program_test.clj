@@ -125,3 +125,26 @@
     (is (re-find #"flowchart LR" m))
     (is (re-find #"\[\[" m) "pure boxes use the doubled-border node")
     (is (re-find #"RESULT" m) "a result node is emitted")))
+
+(deftest inline-call-splices-callee-body
+  (let [outer  (prog/fn->diagram '(defn f [a] (g a)))      ; f calls g
+        callee (prog/fn->diagram '(defn g [x] (* x x)))    ; g squares
+        g-box  (box-by-label outer "g")
+        out    (:out g-box)
+        sp     (prog/inline-call outer (:id g-box) callee)]
+    (testing "the call box is replaced by the callee body, grouped under the call"
+      (is (nil? (box-by-label sp "g")) "the g call box is gone")
+      (let [star (box-by-label sp "*")]
+        (is (some? star) "g's body (*) is spliced in")
+        (is (= (keyword "g") (second (last (:group star)))) "inside a sub-group named g")
+        (testing "the arg `a` is wired in for g's param x (and fans out to both x uses)"
+          (let [a-port (:out (box-by-label sp "a"))]
+            (is (= [a-port a-port] (:ins star)) "x↦a, used twice → copy")))
+        (testing "g's output takes the call's out-port, so f's result is preserved"
+          (is (= out (:out star)))
+          (is (= [out] (:outputs sp))))))
+    (testing "recursion guard: re-splicing the same name on the path is a no-op"
+      (let [star-id (:id (box-by-label sp "*"))
+            ;; pretend * is a call to g already nested under a g-group → guarded
+            sp2 (prog/inline-call sp (:id (box-by-label sp "*")) callee)]
+        (is (= sp sp2) "a call already under a `g` group does not unfold again")))))
