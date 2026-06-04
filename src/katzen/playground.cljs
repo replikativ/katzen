@@ -19,7 +19,7 @@
             ["elkjs/lib/elk.bundled.js" :default ELK]))
 
 (def elk (ELK.))
-(declare layout! toggle-collapse!)
+(declare layout! toggle-collapse! unfold!)
 
 ;; ---------------------------------------------------------------------------
 ;; Hierarchy helpers (collapse/expand of nested sub-flows)
@@ -111,7 +111,8 @@
     {:background "#94a3b8" :width 7 :height 7 :border "none"}))
 
 (defn- render-node [t ^js props]
-  (let [d        (.-data props)
+  (let [id       (.-id props)
+        d        (.-data props)
         label    (aget d "label")
         pure?    (aget d "pure?")
         dropped? (aget d "dropped?")
@@ -119,14 +120,18 @@
         n        (max 1 (or (aget d "inputs") 0))]
     (r/as-element
      [:div {:style (cond-> (node-css t pure?)
-                     expand? (assoc :border "1.5px solid #6366f1" :cursor "pointer"))
-            :title (when expand? (str "double-click to open " label))}
+                     expand? (assoc :border "1.5px solid #6366f1"))
+            :title (when expand? (str "⊞ = unfold " label " here · double-click = step into it"))}
       (map (fn [i]
              [:> Handle {:key (str "in" i) :type "target" :position (.-Left Position)
                          :id (str "in-" i) :style (in-handle-style n i)}])
            (range n))
       [:span {:style {:whiteSpace "nowrap"}} label (when dropped? " ⏚")
-       (when expand? [:span {:style {:color "#6366f1" :marginLeft 4 :fontWeight 700}} "⊞"])]
+       (when expand?
+         [:span {:on-click (fn [e] (.stopPropagation e) (unfold! id label))
+                 :title (str "unfold " label " in place")
+                 :style {:color "#6366f1" :marginLeft 4 :fontWeight 700 :cursor "pointer"}}
+          "⊞"])]
       [:> Handle {:type "source" :position (.-Right Position) :id "out"
                   :style (out-handle-style pure?)}]])))
 
@@ -158,12 +163,15 @@
 ;; State + collapse-aware layout
 ;; ---------------------------------------------------------------------------
 
-;; :rf      — the base (top-level fn) diagram graph {:nodes :edges}
-;; :corpus  — {fn-name(str) → defn-form}, parsed from the textarea (drill targets)
-;; :focus   — a stack of drilled-in frames {:label str :rf {:nodes :edges}}; the
-;;            rendered diagram is the top frame's, or :rf when the stack is empty.
-;;            (Dusko: drilling a call box = run {⌜f⌝}; the stack is the run-stack.)
-(defonce state (r/atom {:code "" :rf nil :dia nil :view :reactflow
+;; :base-dia — the original entry-fn diagram value (for "reset unfolds")
+;; :dia      — the CURRENT diagram value (with any inline unfolds applied); :rf
+;;             and the mermaid view both derive from it
+;; :rf       — the base diagram graph {:nodes :edges} (= ->reactflow of :dia)
+;; :corpus   — {fn-name(str) → defn-form}, parsed from the textarea (drill targets)
+;; :focus    — a stack of drilled-in frames {:label str :rf {:nodes :edges}}; the
+;;             rendered diagram is the top frame's, or :rf when the stack is empty.
+;;             (Dusko: drilling a call box = run {⌜f⌝}; the stack is the run-stack.)
+(defonce state (r/atom {:code "" :rf nil :dia nil :base-dia nil :view :reactflow
                         :corpus {} :focus []
                         :collapsed #{} :nodes #js [] :edges #js [] :err nil}))
 
@@ -273,6 +281,23 @@
   (swap! state #(-> % (assoc :focus (vec (take n (:focus %)))) (assoc :collapsed #{})))
   (layout!))
 
+;; Unfold-in-place — the real operadic substitution (Dusko's {⌜f⌝}): splice the
+;; callee INTO the call box as a collapsible nested sub-flow, in the caller's
+;; context. Mutates the current diagram value; pops any Navigate focus so the
+;; whole inlined program stays on one canvas.
+(defn unfold! [box-id fname]
+  (when-let [form (get-in @state [:corpus fname])]
+    (let [dia' (prog/inline-call (:dia @state) box-id (prog/fn->diagram form))]
+      (swap! state #(-> % (assoc :dia dia' :rf (diagram/->reactflow dia')
+                                 :focus [] :collapsed #{})))
+      (layout!))))
+
+(defn reset-unfolds! []
+  (let [base (:base-dia @state)]
+    (swap! state #(-> % (assoc :dia base :rf (diagram/->reactflow base)
+                               :focus [] :collapsed #{})))
+    (layout!)))
+
 ;; ---------------------------------------------------------------------------
 ;; Examples + recompute
 ;; ---------------------------------------------------------------------------
@@ -315,7 +340,8 @@
   (let [[h n] form] (when (and (contains? '#{defn defn-} h) (symbol? n)) (str n))))
 
 (defn render-diagram! [dia]
-  (swap! state assoc :dia dia :rf (diagram/->reactflow dia) :collapsed #{} :focus [])
+  (swap! state assoc :dia dia :base-dia dia :rf (diagram/->reactflow dia)
+         :collapsed #{} :focus [])
   (layout!))
 
 (defn recompute! [code]
@@ -423,8 +449,9 @@
       (aget d "expandable?")    (drill-into-fn! (aget d "label")))))
 
 (defn app []
-  (let [{:keys [code nodes edges err view dia focus]} @state
-        mcode (when dia (diagram/->mermaid dia))]
+  (let [{:keys [code nodes edges err view dia base-dia focus]} @state
+        mcode     (when dia (diagram/->mermaid dia))
+        unfolded? (and base-dia dia (not (identical? dia base-dia)))]
     [:div {:style {:display "flex" :height "100vh" :fontFamily "monospace"}}
      [:div {:style {:width "36%" :display "flex" :flexDirection "column" :borderRight "1px solid #e1e4e8"}}
       [:div {:style {:padding "8px 12px" :background "#f6f8fa" :borderBottom "1px solid #e1e4e8"
@@ -441,6 +468,7 @@
       [:div {:style {:padding "6px 12px" :fontSize 11 :color "#586069" :borderTop "1px solid #e1e4e8" :lineHeight 1.6}}
        "● on output = pure (cartesian) · multiple ports = multiple args · ⏚ = dropped binding"
        [:br] "nested boxes = if / fn body (click ▾ to collapse) · ↺ dashed = recursion / feedback"
+       [:br] "⊞ call → click = unfold inline (oapply) · double-click = step into it"
        [:br] "diagrams follow "
        [:a {:href "https://link.springer.com/book/10.1007/978-3-031-34827-3"
             :target "_blank" :rel "noopener" :style {:color "#6366f1"}}
@@ -452,6 +480,11 @@
        [view-tab :reactflow "◆ string diagram" (= view :reactflow)]
        [view-tab :mermaid "▤ mermaid" (= view :mermaid)]
        [:span {:style {:flex 1}}]
+       (when unfolded?
+         [:button {:on-click #(reset-unfolds!) :title "re-fold all inlined calls"
+                   :style {:fontFamily "inherit" :fontSize 11 :padding "3px 10px" :cursor "pointer"
+                           :border "1px solid #cbd5e1" :borderRadius 5 :background "#fff" :color "#334155"}}
+          "⤺ reset unfolds"])
        (when (= view :mermaid)
          [:button {:on-click #(copy! mcode) :title "copy mermaid source (paste into any markdown)"
                    :style {:fontFamily "inherit" :fontSize 11 :padding "3px 10px" :cursor "pointer"

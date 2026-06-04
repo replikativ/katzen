@@ -270,6 +270,52 @@
      :wires (vec (distinct (:wires state)))
      :outputs (when out [out])}))
 
+(defn inline-call
+  "Operadic substitution on diagram VALUES: replace the call box `box-id` in
+   `outer` with the *body* of `callee` (another diagram value) — Dusko's `run`
+   on a code, `{⌜f⌝}`. The call's args wire to the callee's params, the callee's
+   output takes the call's place, and the callee body lands in a new sub-group
+   labelled with the callee name (a collapsible nested sub-flow).
+
+   This is the diagram-value analog of `oapply` (the ACSet `oapply` over the
+   `katzen.dwd` operad is the principled monoidal-layer version; this splices the
+   intermediate shape `katzen.diagram` renders, which is what the playground's
+   unfold needs). Returns `outer` UNCHANGED if the box is absent or the splice
+   would recurse — a self/mutual call whose name already labels an ancestor group
+   on the box's path (Dusko: recursion is a Kleene fixpoint / trace, not an
+   infinite unfolding)."
+  [outer box-id callee]
+  (let [b     (first (filter #(= box-id (:id %)) (:boxes outer)))
+        cname (or (:name callee) "fn")]
+    (if (or (nil? b)
+            (some #(= (keyword cname) (second %)) (:group b)))   ; recursion guard
+      outer
+      (let [args      (vec (:ins b))                       ; outer arg out-ports, in order
+            cparams   (mapv :port (:inputs callee))        ; callee param ports
+            coutput   (first (:outputs callee))
+            gpath'    (conj (vec (:group b [])) [box-id (keyword cname)])
+            pre       (fn [x] (str box-id "$" x))          ; namespace callee ids/ports
+            cboxes    (remove :input? (:boxes callee))     ; drop param source boxes
+            all-ports (set (concat (keep :out cboxes) (mapcat :ins cboxes)
+                                   cparams (when coutput [coutput])))
+            ;; ports: params → the outer args, callee output → the call's out-port,
+            ;; everything else → a fresh namespaced port.
+            pmap      (merge (into {} (map (fn [p] [p (pre p)]) all-ports))
+                             (zipmap cparams args)
+                             (when coutput {coutput (:out b)}))
+            re-group  (fn [cg] (into gpath' (map (fn [[cid g]] [(pre cid) g]) cg)))
+            new-boxes (for [bx cboxes]
+                        (-> bx (update :id pre) (update :out pmap)
+                            (update :ins #(mapv pmap %))
+                            (assoc :group (re-group (:group bx [])))))
+            new-wires (for [w (:wires callee)]
+                        (-> w (update :from pmap) (update :to pmap)))]
+        (-> outer
+            ;; drop the call box and the arg→box wires (args now feed the body)
+            (assoc :boxes (vec (concat (remove #(= box-id (:id %)) (:boxes outer)) new-boxes)))
+            (assoc :wires (vec (distinct (concat (remove #(= (:out b) (:to %)) (:wires outer))
+                                                 new-wires)))))))))
+
 (defn fn->mermaid
   "Convenience: a `defn`/`fn` form → mermaid string (via `katzen.diagram`)."
   [form]
