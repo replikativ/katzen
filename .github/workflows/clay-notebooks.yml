@@ -31,6 +31,10 @@ jobs:
   render-notebooks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # deploy-pages@v4 requires the job to declare the github-pages environment.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -111,6 +115,8 @@ jobs:
           # Served from /katzen/playground/, so use a relative script path.
           sed 's#/dist/playground/playground.js#./dist/playground/playground.js#' \
             examples/playground.html > _site/playground/index.html
+          # Serve the artifact as-is — no Jekyll/Liquid processing.
+          touch _site/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -121,4 +127,5 @@ jobs:
           path: "_site"
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

@@ -63,7 +63,7 @@ functions call graph) to a wiring diagram.
 | binding used N× | **copy** `Δ` (fan-out, explicit) | comonoid (CD) |
 | binding used 0× | **delete** `▪` (ground, explicit) | comonoid (CD) |
 | **pure, total fn** | the **cartesian bead `•`** — licenses CSE/DCE | cartesian sub-cat |
-| `(if c t e)` | a **`cond` box**: a control port + the two branches as **nested sub-diagrams** (= the branch program-codes) | **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = {{c}(⌜t⌝, ⌜e⌝)}` — select a program code via `{c}`, then `run` it; only one branch runs (Pavlović §3.6.1, Eq 3.31). A well-defined `if` wants a **decidable** (pure/total = beaded) predicate (§2.4.1). |
+| `(if c t e)` | a **`cond` box**: a control port + the two branches as **nested sub-diagrams** (= the branch program-codes) | **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = { {c}(⌜t⌝, ⌜e⌝)}` — select a program code via `{c}`, then `run` it; only one branch runs (Pavlović §3.6.1, Eq 3.31). A well-defined `if` wants a **decidable** (pure/total = beaded) predicate (§2.4.1). |
 | `(fn …)` literal | a **`:program` box** ⌜·⌝ (an element of `P`) with its body as a nested sub-diagram; free vars wire in as the closure | monoidal computer |
 | applying a fn value: `(g x)` (g local), `((fn …) x)`, HOF | a **`:run`/apply box** — Dusko's `{g} x` | monoidal computer |
 | bare fn ref as a value (`inc` in `(map inc xs)`) | a **`:program` code box** ⌜inc⌝ | monoidal computer |
@@ -77,7 +77,7 @@ are understood as the classical counterparts, to revisit):
   `eval`/macros.
 - **Recursion = a fixpoint**, *rendered* as a trace loop (see §4).
 - **Conditionals = Pavlović's lazy branching** (§3.6.1, Eq 3.31):
-  `ift(c, F, G) = {{c}(F, G)}` — the branches are **program codes** `F = ⌜then⌝`,
+  `ift(c, F, G) = { {c}(F, G)}` — the branches are **program codes** `F = ⌜then⌝`,
   `G = ⌜else⌝`; `{c}` selects one code; the outer `run` evaluates it; **only one
   branch runs**. We render the two codes as nested sub-diagrams and the selection
   as a `cond` box (a *view* of this morphism — see §4). This is purely the
@@ -118,7 +118,7 @@ literatures:
    object `P` and a universal evaluator `run : P × A → B`. Then a conditional is
    **lazy branching** (*Programs as Diagrams* §3.6.1, Eq. 3.31):
 
-   > `ift(c, F, G) = {{c}(F, G)}`,  with `F = ⌜then⌝`, `G = ⌜else⌝ ∈ P`.
+   > `ift(c, F, G) = { {c}(F, G)}`,  with `F = ⌜then⌝`, `G = ⌜else⌝ ∈ P`.
 
    Read it inside-out: the branches are first *reified as program codes* `⌜then⌝`,
    `⌜else⌝` (elements of `P` — **data, not yet running**). The inner `{c}(F, G)`
@@ -192,7 +192,7 @@ load-bearing — they're all serializations of one ACSet.
    sub-diagrams (the branch program-codes) and rendered as nested subgraphs; the
    condition + both branch outputs wire into the box (the selection); shared
    in-scope values flow into both branches. Semantics = Pavlović's lazy
-   `ift(c, ⌜then⌝, ⌜else⌝) = {{c}(⌜then⌝, ⌜else⌝)}` (§3.6.1, Eq 3.31) — select a
+   `ift(c, ⌜then⌝, ⌜else⌝) = { {c}(⌜then⌝, ⌜else⌝)}` (§3.6.1, Eq 3.31) — select a
    code, then `run` it; only one branch runs. Pure monoidal computer — no operad,
    no coproduct. (The nested-branch *drawing* is the view; that both are drawn
    exposes structure, that one runs is the semantics.)

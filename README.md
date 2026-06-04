@@ -285,7 +285,7 @@ bead `•`** — which is exactly what licenses CSE / dead-code elimination.
 
 Where Catlab's `@program` is *straight-line* (no branching), katzen extends it
 with the constructs branching needs, taken from Pavlović rather than invented:
-`if` is **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = {{c}(⌜t⌝, ⌜e⌝)}` (the branches are
+`if` is **lazy branching** `ift(c, ⌜t⌝, ⌜e⌝) = { {c}(⌜t⌝, ⌜e⌝)}` (the branches are
 program codes; only the selected one runs), `fn`/HOF are an element of the
 program object `P` plus the universal `run`, and recursion is a Kleene fixpoint
 *rendered* as a trace/feedback loop. Crucially, a pure function and a control
